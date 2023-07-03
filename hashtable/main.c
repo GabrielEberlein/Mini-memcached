@@ -1,9 +1,9 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "./functions/io.h"
-#include "./functions/hash.h"
-#include "./functions/bst.h"
+#include "./io.h"
+#include "./hash.h"
+#include "./bst.h"
 
 void handle_command(char* command, HashTable table){
     char *request = strtok(command, " ");
