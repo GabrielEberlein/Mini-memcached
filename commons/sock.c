@@ -9,21 +9,21 @@ int mk_tcp_sock(in_port_t port)
 	struct sockaddr_in sa;
 	int yes = 1;
 
-	/*Completar la llamada a socket y descomentar*/
-	/*s = socket(..completar ..);
+	s = socket(AF_INET, SOCK_STREAM, 0);
 	if (s < 0)
-		quit("socket");*/
+		quit("socket");
 
 	rc = setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof yes);
 	if (rc != 0)
 		quit("setsockopt");
 
+	sa.sin_family = AF_INET;
+	sa.sin_port = port;
+	sa.sin_addr.s_addr = htonl(INADDR_ANY);
 
-	/*Completar  y descomentar*/
-	/* rc = bind(s, ....);
+	rc = bind(s, (struct sockaddr *)&sa, sizeof sa);
 	if (rc < 0)
 		quit("bind");
-	*/
 
 	rc = listen(s, 10);
 	if (rc < 0)

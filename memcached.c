@@ -128,8 +128,60 @@ void server(int text_sock, int bin_sock)
 {
 
 	/*Configurar Epoll*/
+	int efd, nfds, csock;
+	efd = epoll_create1(0);
+	if(efd == -1) {
+		perror("epoll_create1");
+		exit(EXIT_FAILURE);
+	}
 
-	
+	ev.events = EPOLLIN ;
+	ev.data.fd = text_sock;
+	if (epoll_ctl (efd, EPOLL_CTL_ADD, text_sock, &ev) == -1) {
+		perror("epoll_ctl: text_sock");
+		exit(EXIT_FAILURE);
+	}
+
+	ev.events = EPOLLIN ;
+	ev.data.fd = bin_sock;
+	if (epoll_ctl (efd, EPOLL_CTL_ADD, bin_sock, &ev) == -1) {
+		perror("epoll_ctl: bin_sock");
+		exit(EXIT_FAILURE);
+	}
+
+	for(;;) {
+		/* Esperamos una ó varias conecciones, no nos interesa de donde vienen */
+		nfds = epoll_wait(efd, events, MAX_EVENTS, -1);
+		if(nfds == -1) {
+			perror("epoll_wait");
+			exit(EXIT_FAILURE);
+		}
+		/* Atendemos a cada una de las conecciones */
+		for(int i = 0; i < nfds; i++) {
+			/* Verificamos si es un cliente nuevo */
+			if(events[i].data.fd == text_sock) {
+                /* Si es una nuevo cliente, aceptamos su conexión */
+				csock = accept(text_sock, NULL, NULL);
+                if(csock == -1) {
+                    perror("accept");
+                    exit(EXIT_FAILURE);
+                }
+				/* Setea el socket a no bloqueante */
+                isnonblocking(csock);
+                ev.data.fd = csock;
+                ev.events = EPOLLIN | EPOLLET;
+				/* Añadimos el nuevo cliente a la lista de instancias del epoll creado */
+                if(epoll_ctl(efd, EPOLL_CTL_ADD, csock, &ev) == -1) {
+                    perror("epoll_ctl: csock");
+                    exit(EXIT_FAILURE);
+                }
+			} else {
+				/* Si es un cliente donde la conexión ya fue aceptada, manejamos lo que nos envia*/
+				handle_conn(events[i].data.fd);
+			}
+		}
+	}
+
 	/*Creación de threads necesarios*/
 	/*La cantidad de threads debe ser fija al iniciar el servidor
 	todos los thread tendran acceso a la misma estructura epoll 
@@ -161,16 +213,17 @@ int main(int argc, char **argv)
 	char buf[2024];
 	int fd = open(argv[1], O_RDONLY);
 	text_consume(NULL, buf, fd, 0);
+
 	/*Función que limita la memoria*/
 	//limit_mem(0);
 
-	/*text_sock = mk_tcp_sock(mc_lport_text);
+	text_sock = mk_tcp_sock(mc_lport_text);
 	if (text_sock < 0)
 		quit("mk_tcp_sock.text");
 
 	bin_sock = mk_tcp_sock(mc_lport_bin);
 	if (bin_sock < 0)
-		quit("mk_tcp_sock.bin");*/
+		quit("mk_tcp_sock.bin");
 
 	// int commandsAmnt = 0;
 	// char **commands = readfile(argv[1], &commandsAmnt);
@@ -179,7 +232,7 @@ int main(int argc, char **argv)
 	// table = hashtable_create(1<<20);
 
 	// for(int i=0; i<commandsAmnt; i++){
-    //     text_handle(commands[i], table);
+    //     	text_handle(commands[i], table);
 	//  	free(commands[i]);
     // }
 

@@ -18,8 +18,6 @@
 		return -1;						\
 	rc; })
 
-
-
 int text_parser(const char *buf, char *toks[3], int lens[3])
 {
 //	char *toks[10];
