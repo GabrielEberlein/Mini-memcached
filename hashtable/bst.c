@@ -4,11 +4,12 @@
 /**
  * Crea un nuevo contacto.
  */
-Node new_pair(char *key, int value) {
-  Node newNode = malloc(sizeof(struct _Node));
+BST new_pair(char *key, int value) {
+  BST newNode = malloc(sizeof(struct _BST));
   assert(newNode != NULL);
 
   newNode->key = malloc(sizeof(char) * (strlen(key) + 1));
+  assert(newNode->key != NULL);
   newNode->value = value;
   strcpy(newNode->key, key);
   newNode->left = NULL;
@@ -18,12 +19,12 @@ Node new_pair(char *key, int value) {
   return newNode;
 }
 
-int size(Node node){
+int size(BST node){
   if(node==NULL) return 0;
   return node->size;
 }
 
-Node insert_bst(Node node, char* key, int value) {
+BST insert_bst(BST node, char* key, int value) {
   if (node==NULL) return new_pair(key, value);
 
   int cmp = strcmp(node->key, key);
@@ -36,10 +37,10 @@ Node insert_bst(Node node, char* key, int value) {
   return node;
 }
 
-Node delete_node(Node node){
-  Node replacement;
+BST delete_node(BST node){
+  BST replacement;
   if(node->left){
-    Node prev = NULL;
+    BST prev = NULL;
     replacement = node->left;
     while(replacement->right){ 
       prev = replacement;
@@ -58,7 +59,7 @@ Node delete_node(Node node){
   return replacement;
 }
 
-Node delete_bst(Node node, char* key){
+BST delete_bst(BST node, char* key){
   if(node==NULL) return NULL;
   int cmp = strcmp(node->key, key);
 
@@ -69,12 +70,13 @@ Node delete_bst(Node node, char* key){
   return node;
 }
 
-int search_bst(Node node, char *key){
+int search_bst(BST node, char *key){
   if(node == NULL) return -1;
   int cmp = strcmp(node->key, key);
   if (cmp == 0) return node->value;
   if (cmp > 0 ) return search_bst(node->left, key);
   if (cmp < 0 ) return search_bst(node->right, key);
+  return -1;
 }
 
 /**
@@ -87,7 +89,7 @@ int compare_keys(char *k1, char *k2) {
 /**
  * Función destructora de un contacto.
  */
-Node free_bst(Node node) {
+BST free_bst(BST node) {
     if(node != NULL){
         free(node->key);
         free_bst(node->left);

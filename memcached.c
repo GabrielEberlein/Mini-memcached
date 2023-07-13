@@ -9,10 +9,17 @@
 #include <signal.h>
 #include <pthread.h>
 #include <errno.h>
-#include "sock.h"
-#include "common.h"
+#include <fcntl.h>
+#include "commons/sock.h"
+#include "commons/common.h"
+#include "commons/parser.h"
+#include "hashtable/hash.h"
+#include "queue/queue.h"
 
-#include "parser.h"
+#define MAX_EVENTS 10
+struct epoll_event ev, events[MAX_EVENTS];
+HashTable table;
+Queue* priorityqueue;
 
 /* Macro interna */
 #define READ(fd, buf, n) ({						\
@@ -23,16 +30,40 @@
 		return -1;						\
 	rc; })
 
+void text_handle(struct eventloop_data *evd, char *args[3], int nargs){
+	char *cmd = args[0];
+
+    if(strcmp(cmd,"PUT") == 0){
+		assert(nargs == 3);
+        char *key = args[1];
+        char *val = args[2];
+        insert_hashtable(table, key, atoi(val));
+    }
+
+    if(strcmp(cmd,"GET") == 0){
+		assert(nargs == 2);
+        char *key = args[1];
+        printf("%d\n",search_hashtable(table, key));
+    }
+
+    if(strcmp(cmd,"DEL") == 0){
+		assert(nargs == 2);
+        char *key = args[1];
+        delete_hashtable(table, key);
+    } 
+}
+
 /* 0: todo ok, continua. -1 errores */
 int text_consume(struct eventloop_data *evd, char buf[2024], int fd, int blen)
 {
 	while (1) {
-		int rem = sizeof *buf - blen;
+		//int rem = sizeof *buf - blen;
+		int rem = 2024 - blen;
 		assert (rem >= 0);
 		/* Buffer lleno, no hay comandos, matar */
 		if (rem == 0)
 			return -1;
-		int nread = READ(fd, buf + blen, rem);
+		int nread = READ(fd, buf + blen, rem);	
 
 		log(3, "Read %i bytes from fd %i", nread, fd);
 		blen += nread;
@@ -48,9 +79,10 @@ int text_consume(struct eventloop_data *evd, char buf[2024], int fd, int blen)
 			char *toks[3]= {NULL};
 			int lens[3] = {0};
 			int ntok;
-			ntok = text_parser(buf,toks,lens);
+			ntok = text_parser(p0,toks,lens);
 
-			/*text_handle(evd, p0, len, ....);
+			text_handle(evd, toks, ntok);
+			/*
 				Acá podríamos ver que hacemos con los tokens encontrados:
 				toks[0] tendrá PUT, GET, DEL, ó STATS si se ingresó un comando válido.
 			*/
@@ -67,9 +99,24 @@ int text_consume(struct eventloop_data *evd, char buf[2024], int fd, int blen)
 	return 0;
 }
 
-void limit_mem()
+void limit_mem(size_t limit)
 {
-	/*Implementar*/
+	struct rlimit mem_limit;
+
+    if (getrlimit(RLIMIT_AS, &mem_limit) == -1) {
+        perror("getrlimit");
+        exit(EXIT_FAILURE);
+    }
+
+    // mem_limit.rlim_cur = 1073741824;  // 1 GB
+	mem_limit.rlim_max = limit;
+	mem_limit.rlim_cur = limit;
+	printf("%d\n", limit);
+
+    if (setrlimit(RLIMIT_AS, &mem_limit) == -1) {
+        perror("setrlimit");
+        exit(EXIT_FAILURE);
+    }
 }
 
 void handle_signals()
@@ -80,9 +127,10 @@ void handle_signals()
 void server(int text_sock, int bin_sock)
 {
 
-	/*Configurar Epoll
-	+
-	Creación de threads necesarios*/
+	/*Configurar Epoll*/
+
+	
+	/*Creación de threads necesarios*/
 	/*La cantidad de threads debe ser fija al iniciar el servidor
 	todos los thread tendran acceso a la misma estructura epoll 
 	e iran manejando los eventos que vayan apareciendo.
@@ -108,26 +156,35 @@ int main(int argc, char **argv)
 	__loglevel = 2;
 
 	handle_signals();
-
+	table = hashtable_create(1<<20);
+	priorityqueue = create_queue();
+	char buf[2024];
+	int fd = open(argv[1], O_RDONLY);
+	text_consume(NULL, buf, fd, 0);
 	/*Función que limita la memoria*/
-	limit_mem();
+	//limit_mem(0);
 
-	text_sock = mk_tcp_sock(mc_lport_text);
+	/*text_sock = mk_tcp_sock(mc_lport_text);
 	if (text_sock < 0)
 		quit("mk_tcp_sock.text");
 
 	bin_sock = mk_tcp_sock(mc_lport_bin);
 	if (bin_sock < 0)
-		quit("mk_tcp_sock.bin");
+		quit("mk_tcp_sock.bin");*/
 
+	// int commandsAmnt = 0;
+	// char **commands = readfile(argv[1], &commandsAmnt);
+	// /*Inicializar la tabla hash, con una dimensión apropiada*/
+	// /* 1 millón de entradas, por ejemplo*/
+	// table = hashtable_create(1<<20);
 
-	/*Inicializar la tabla hash, con una dimensión apropiada*/
-	/* 1 millón de entradas, por ejemplo*/
-	/* .....*/
-
+	// for(int i=0; i<commandsAmnt; i++){
+    //     text_handle(commands[i], table);
+	//  	free(commands[i]);
+    // }
 
 	/*Iniciar el servidor*/
-	server(text_sock, bin_sock);
+	//server(text_sock, bin_sock);
 
 	return 0;
 }

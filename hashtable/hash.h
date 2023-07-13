@@ -13,7 +13,7 @@ typedef unsigned (*HashFunction)(void *data);
 /** Retorna un entero sin signo para el dato */
 
 struct _HashTable {
-  Node *elems;
+  BST *elems;
   unsigned numElems;
   unsigned collisions;
   unsigned capacity;

@@ -7,17 +7,17 @@
 #include <stdlib.h>
 #include <string.h>
 
-struct _Node{
+struct _BST{
   char *key;
   int value;
   int size;
-  struct _Node *left;
-  struct _Node *right;
+  struct _BST *left;
+  struct _BST *right;
 };
 
-typedef struct _Node* Node;
+typedef struct _BST* BST;
 
-Node new_pair(char *word, int value);
+BST new_pair(char *word, int value);
 
 /**
  * Retorna 0 si los contactos tienen el mismo nombre.
@@ -28,16 +28,16 @@ int compare_keys(char *w1, char *w2);
  * Función destructora de un contacto.
  */
 
-int size(Node node);
+int size(BST node);
 
-Node free_bst(Node node);
+BST free_bst(BST node);
 
-Node delete_node(Node node);
+BST delete_node(BST node);
 
-Node insert_bst(Node node, char* key, int value);
+BST insert_bst(BST node, char* key, int value);
 
-Node delete_bst(Node node, char *key);
+BST delete_bst(BST node, char *key);
 
-int search_bst(Node node, char* key);
+int search_bst(BST node, char* key);
 
 #endif /* __CONTACTO_H__ */
