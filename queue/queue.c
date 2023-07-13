@@ -43,3 +43,32 @@ int pop_queue(Queue* queue) {
     free(lastNode);
     return lastData;
 }
+
+int relocate_queue(Queue* queue, Node node) {
+    if (node->prev != NULL) {
+        if(node->next != NULL) {
+            node->next->prev = node->prev;
+        }
+        node->prev->next = node->next;
+        queue->last = node->prev;
+        node->prev = NULL;
+        node->next = queue->first;
+        queue->first = node;
+    } 
+    return node->data;
+}
+
+void destroy_list(Node firstNode) {
+    Node currentNode = firstNode;
+    while (currentNode != NULL) {
+        Node nextNode = currentNode->next;
+        free(currentNode);
+        currentNode = nextNode;
+    }
+}
+
+void destroy_queue(Queue* queue) {
+    Node firstNode = queue->first;
+    destroyList(firstNode);
+    free(queue);
+}
