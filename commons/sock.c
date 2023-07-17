@@ -18,7 +18,7 @@ int mk_tcp_sock(in_port_t port)
 		quit("setsockopt");
 
 	sa.sin_family = AF_INET;
-	sa.sin_port = port;
+	sa.sin_port = htons(port);
 	sa.sin_addr.s_addr = htonl(INADDR_ANY);
 
 	rc = bind(s, (struct sockaddr *)&sa, sizeof sa);

@@ -36,7 +36,7 @@ BST delete_node(BST node);
 
 BST insert_bst(BST node, char* key, int value);
 
-BST delete_bst(BST node, char *key);
+int delete_bst(BST* node, char *key);
 
 int search_bst(BST node, char* key);
 

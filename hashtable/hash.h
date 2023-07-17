@@ -25,7 +25,7 @@ typedef struct _HashTable *HashTable;
 
 void insert_hashtable(HashTable table, char *key, int value);
 
-void delete_hashtable(HashTable table, char *key);
+int delete_hashtable(HashTable table, char *key);
 
 int search_hashtable(HashTable table, char *key);
 

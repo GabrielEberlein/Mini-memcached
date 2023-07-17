@@ -59,15 +59,15 @@ BST delete_node(BST node){
   return replacement;
 }
 
-BST delete_bst(BST node, char* key){
-  if(node==NULL) return NULL;
-  int cmp = strcmp(node->key, key);
+int delete_bst(BST* node, char* key){
+  if((*node)==NULL) return -1;
+  int cmp = strcmp((*node)->key, key);
 
-  if (cmp == 0) node = delete_node(node);
-  if (cmp > 0 ) node->left  = delete_bst(node->left, key);
-  if (cmp < 0 ) node->right = delete_bst(node->right, key);
+  if (cmp == 0) (*node) = delete_node((*node));
+  if (cmp > 0 ) return delete_bst(&((*node)->left), key);
+  if (cmp < 0 ) return delete_bst(&((*node)->right), key);
 
-  return node;
+  return 0;
 }
 
 int search_bst(BST node, char *key){

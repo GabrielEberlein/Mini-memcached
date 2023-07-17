@@ -53,7 +53,7 @@ HashTable hashtable_create(unsigned capacity) {
   // Pedimos memoria para la estructura principal y las casillas.
   HashTable table = malloc(sizeof(struct _HashTable));
   assert(table != NULL);
-  table->elems = malloc(sizeof(struct _Node) * capacity);
+  table->elems = malloc(sizeof(struct _BST) * capacity);
   assert(table->elems != NULL);
   table->numElems = 0;
   table->collisions = 0;
@@ -70,7 +70,7 @@ HashTable hashtable_create(unsigned capacity) {
   return table;
 }
 
-void insert_bst_hashtable (HashTable table, Node bst) {
+void insert_bst_hashtable (HashTable table, BST bst) {
   if (bst == NULL) return;
 
   insert_hashtable(table, bst->key, bst->value);
@@ -114,11 +114,12 @@ void insert_hashtable(HashTable table, char *key, int value){
   table->numElems++;
 }
 
-void delete_hashtable(HashTable table, char* key){
+int delete_hashtable(HashTable table, char* key){
   unsigned idx = table->hash(key) % table->capacity;
   table->numElems -= size(table->elems[idx]);
-  table->elems[idx] = delete_bst(table->elems[idx], key);
+  int res = delete_bst(&(table->elems[idx]), key);
   table->numElems += size(table->elems[idx]);
+  return res;
 }
 
 int search_hashtable(HashTable table, char *key){
