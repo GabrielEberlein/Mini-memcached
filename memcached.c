@@ -17,9 +17,17 @@
 #include "queue/queue.h"
 
 #define MAX_EVENTS 10
+#define MAX_THREADS 5
+
 struct epoll_event ev, events[MAX_EVENTS];
 HashTable table;
 Queue* priorityqueue;
+
+struct ThreadArgs{
+	int text_sock;
+	int bin_sock;
+	int efd;
+};
 
 /* Macro interna */
 #define READ(fd, buf, n) ({						\
@@ -164,18 +172,59 @@ void handle_signals()
 	/*Capturar y manejar  SIGPIPE */
 }
 
-void server(int text_sock, int bin_sock)
-{
+void *thread(void *args) {
+	
+	int nfds, csock;
 
-	/*Configurar Epoll*/
-	int efd, nfds, csock;
-	efd = epoll_create1(0);
+	struct ThreadArgs* thread_args = (struct ThreadArgs*)args;
+
+    int text_sock = thread_args->text_sock;
+	int bin_sock = thread_args->bin_sock;
+    int efd = thread_args->efd;
+
+	while(1) {
+		nfds = epoll_wait(efd, events, MAX_EVENTS, -1);
+		if(nfds == -1) {
+			perror("epoll_wait");
+			exit(EXIT_FAILURE);
+		}
+		for(int i = 0; i < nfds; i++) {
+			if(events[i].data.fd == text_sock || events[i].data.fd == bin_sock) {
+				csock = accept(text_sock, NULL, NULL);
+                if(csock == -1) {
+                    perror("accept");
+                    exit(EXIT_FAILURE);
+                }
+                isnonblocking(csock);
+                ev.data.fd = csock;
+				ev.data.u32 = events[i].data.fd;
+                ev.events = EPOLLIN | EPOLLET | EPOLLONESHOT;
+                if(epoll_ctl(efd, EPOLL_CTL_ADD, csock, &ev) == -1) {
+                    perror("epoll_ctl: csock");
+                    exit(EXIT_FAILURE);
+                }
+			} else {
+				if (events[i].data.u32 == text_sock) handle_text(events[i].data.fd);
+				else handle_bin(events[i].data.fd);
+				events[i].events = EPOLLIN | EPOLLET | EPOLLONESHOT;
+				if (epoll_ctl(efd, EPOLL_CTL_MOD, events[i].data.fd, &events[i]) == -1) {
+                	perror("epoll_ctl EPOLL_CTL_MOD");
+                	exit(EXIT_FAILURE);
+            	}
+			}
+		}
+	}
+}
+
+void server(int text_sock, int bin_sock) {
+	
+	int efd = epoll_create1(0);
 	if(efd == -1) {
 		perror("epoll_create1");
 		exit(EXIT_FAILURE);
 	}
 
-	ev.events = EPOLLIN ;
+	ev.events = EPOLLIN;
 	ev.data.fd = text_sock;
 	if (epoll_ctl (efd, EPOLL_CTL_ADD, text_sock, &ev) == -1) {
 		perror("epoll_ctl: text_sock");
@@ -189,54 +238,25 @@ void server(int text_sock, int bin_sock)
 		exit(EXIT_FAILURE);
 	}
 
-	for(;;) {
-		/* Esperamos una ó varias conecciones, no nos interesa de donde vienen */
-		nfds = epoll_wait(efd, events, MAX_EVENTS, -1);
-		if(nfds == -1) {
-			perror("epoll_wait");
-			exit(EXIT_FAILURE);
-		}
-		/* Atendemos a cada una de las conecciones */
-		for(int i = 0; i < nfds; i++) {
-			/* Verificamos si es un cliente nuevo */
-			if(events[i].data.fd == text_sock) {
-                /* Si es una nuevo cliente, aceptamos su conexión */
-				csock = accept(text_sock, NULL, NULL);
-                if(csock == -1) {
-                    perror("accept");
-                    exit(EXIT_FAILURE);
-                }
-				/* Setea el socket a no bloqueante */
-                isnonblocking(csock);
-                ev.data.fd = csock;
-                ev.events = EPOLLIN | EPOLLET | EPOLLONESHOT;
-				// ev.events = EPOLLIN | EPOLLET;
-				/* Añadimos el nuevo cliente a la lista de instancias del epoll creado */
-                if(epoll_ctl(efd, EPOLL_CTL_ADD, csock, &ev) == -1) {
-                    perror("epoll_ctl: csock");
-                    exit(EXIT_FAILURE);
-                }
-			} else {
-				/* Si es un cliente donde la conexión ya fue aceptada, manejamos lo que nos envia*/
-				char buf[2024];
-				text_consume(NULL,buf,events[i].data.fd,0);
-				ev.data.fd = events[i].data.fd;
-                ev.events = EPOLLIN | EPOLLET | EPOLLONESHOT;
-				/* Añadimos el nuevo cliente a la lista de instancias del epoll creado */
-                if(epoll_ctl(efd, EPOLL_CTL_MOD, csock, &ev) == -1) {
-                    perror("epoll_ctl: csock");
-                    exit(EXIT_FAILURE);
-                }
-			}
-		}
-	}
+	struct ThreadArgs *args = (struct ThreadArgs*)malloc(sizeof(struct ThreadArgs));;
+	args->text_sock = text_sock;
+	args->bin_sock = bin_sock;
+	args->efd = efd;
 
-	/*Creación de threads necesarios*/
-	/*La cantidad de threads debe ser fija al iniciar el servidor
-	todos los thread tendran acceso a la misma estructura epoll 
-	e iran manejando los eventos que vayan apareciendo.
-	*/
+	pthread_t threads[MAX_THREADS];
+    for (int i = 0; i < MAX_THREADS; ++i) {
+        if (pthread_create(&threads[i], NULL, thread, args) != 0) {
+            fprintf(stderr, "Error creando el hilo %d\n", i);
+            exit(EXIT_FAILURE);
+        }
+    }
 
+	for (int i = 0; i < MAX_THREADS; ++i) {
+        if (pthread_join(threads[i], NULL) != 0) {
+            fprintf(stderr, "Error al esperar al hilo %d\n", i);
+            exit(EXIT_FAILURE);
+        }
+    }
 
 	/*En algún momento al manejar eventos de tipo EPOLLIN de un cliente 
 	en modo texto invocaremos a text_consume: 
@@ -245,8 +265,6 @@ void server(int text_sock, int bin_sock)
 	y  al parecido habrá que hacer al momento al manejar eventos de tipo 
 	EPOLLIN de un cliente en modo binario.	
 	*/
-
-
 }
 
 int main(int argc, char **argv)
@@ -276,7 +294,6 @@ int main(int argc, char **argv)
 	// /* 1 millón de entradas, por ejemplo*/
 	// table = hashtable_create(1<<20);
 
-	/*Iniciar el servidor*/
 	server(text_sock, bin_sock);
 
 	return 0;
