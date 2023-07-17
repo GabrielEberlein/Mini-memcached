@@ -19,7 +19,7 @@
 #define MAX_EVENTS 10
 #define MAX_THREADS 5
 
-struct epoll_event ev, events[MAX_EVENTS];
+struct epoll_event events[MAX_EVENTS];
 HashTable table;
 Queue* priorityqueue;
 
@@ -40,7 +40,7 @@ struct ThreadArgs{
 
 void text_handle(int fd, char *args[3], int nargs){
 	char *cmd = args[0];
-	printf("NAZI\n");
+	log(1,"NAZI\n");
     if(strcmp(cmd,"PUT") == 0){
 		assert(nargs == 3);
         char *key = args[1];
@@ -77,7 +77,7 @@ void text_handle(int fd, char *args[3], int nargs){
 }
 
 /* 0: todo ok, continua. -1 errores */
-int text_consume(struct eventloop_data *evd, char buf[2024], int fd, int blen)
+int text_consume(char buf[2024], int fd, int blen)
 {
 	while (1) {
 		//int rem = sizeof *buf - blen;
@@ -190,22 +190,43 @@ void *thread(void *args) {
 		}
 		for(int i = 0; i < nfds; i++) {
 			if(events[i].data.fd == text_sock || events[i].data.fd == bin_sock) {
+				log(1, "Nuevo Cliente\n");
+				
 				csock = accept(text_sock, NULL, NULL);
                 if(csock == -1) {
                     perror("accept");
                     exit(EXIT_FAILURE);
                 }
+
                 isnonblocking(csock);
+								
+				struct epoll_event ev;
+				ev.data.u32 = (uint32_t)events[i].data.fd;
+				ev.events = EPOLLIN | EPOLLET | EPOLLONESHOT;
                 ev.data.fd = csock;
-				ev.data.u32 = events[i].data.fd;
-                ev.events = EPOLLIN | EPOLLET | EPOLLONESHOT;
+
                 if(epoll_ctl(efd, EPOLL_CTL_ADD, csock, &ev) == -1) {
                     perror("epoll_ctl: csock");
                     exit(EXIT_FAILURE);
                 }
+
+                ev.data.fd = text_sock;
+				ev.events = EPOLLIN | EPOLLONESHOT;
+				if (epoll_ctl(efd, EPOLL_CTL_MOD, text_sock, &ev) == -1) {
+                	perror("epoll_ctl EPOLL_CTL_MOD");
+                	exit(EXIT_FAILURE);
+            	}
 			} else {
-				if (events[i].data.u32 == text_sock) handle_text(events[i].data.fd);
-				else handle_bin(events[i].data.fd);
+				log(1, "Nuevo Mensaje\n");
+				
+				char buffer[2024];
+				if (events[i].data.u32 == text_sock) {
+					text_consume(buffer, events[i].data.fd, 0);
+				} else {
+					//bin_consume(buffer, events[i].data.fd, 0);
+				}
+				log(1, "Leyo el mensaje\n");
+
 				events[i].events = EPOLLIN | EPOLLET | EPOLLONESHOT;
 				if (epoll_ctl(efd, EPOLL_CTL_MOD, events[i].data.fd, &events[i]) == -1) {
                 	perror("epoll_ctl EPOLL_CTL_MOD");
@@ -219,19 +240,21 @@ void *thread(void *args) {
 void server(int text_sock, int bin_sock) {
 	
 	int efd = epoll_create1(0);
+	struct epoll_event ev;
+
 	if(efd == -1) {
 		perror("epoll_create1");
 		exit(EXIT_FAILURE);
 	}
 
-	ev.events = EPOLLIN;
+	ev.events = EPOLLIN | EPOLLONESHOT;
 	ev.data.fd = text_sock;
 	if (epoll_ctl (efd, EPOLL_CTL_ADD, text_sock, &ev) == -1) {
 		perror("epoll_ctl: text_sock");
 		exit(EXIT_FAILURE);
 	}
 
-	ev.events = EPOLLIN ;
+	ev.events = EPOLLIN | EPOLLONESHOT;
 	ev.data.fd = bin_sock;
 	if (epoll_ctl (efd, EPOLL_CTL_ADD, bin_sock, &ev) == -1) {
 		perror("epoll_ctl: bin_sock");
