@@ -2,6 +2,8 @@
 #define __HASH_H_
 
 #include "bst.h"
+#define SEED 0
+#define NUM_REGIONS 1000
 
 /** Retorna una copia fisica del dato */
 typedef int (*CompareFunction)(void *data1, void *data2);
@@ -14,9 +16,9 @@ typedef unsigned (*HashFunction)(void *data);
 
 struct _HashTable {
   BST *elems;
-  unsigned numElems;
-  unsigned collisions;
+  pthread_mutex_t locks[NUM_REGIONS];
   unsigned capacity;
+  unsigned range;
   CompareFunction comp;
   DestructorFunction destr;
   HashFunction hash;
