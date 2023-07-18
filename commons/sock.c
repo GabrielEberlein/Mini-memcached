@@ -1,6 +1,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
+#include <fcntl.h>
 #include "common.h"
 
 int mk_tcp_sock(in_port_t port)
@@ -30,5 +31,40 @@ int mk_tcp_sock(in_port_t port)
 		quit("listen");
 
 	return s;
+}
+
+static int isnonblocking(int sfd)
+{
+	int flags, s;
+
+	/* Obtiene las flags del socket */
+	flags = fcntl (sfd, F_GETFL, 0);
+	if (flags == -1) {
+		perror ("fcntl");
+		return -1;
+	}
+
+	/* 
+	* Si la bandera O_NONBLOCK, la cual especifica que el socket no se bloquee,
+	* no está en flags, la agrega
+	*/
+	flags |= O_NONBLOCK;
+	s = fcntl (sfd, F_SETFL, flags);
+	if (s == -1) {
+		perror ("fcntl");
+		return -1;
+	}
+
+	return 0;
+}
+
+int new_client(int sock){
+	int csock = accept(sock, NULL, NULL);
+	if(csock == -1) {
+        perror("accept");
+        exit(EXIT_FAILURE);
+    }
+	isnonblocking(csock);
+	return csock;
 }
 

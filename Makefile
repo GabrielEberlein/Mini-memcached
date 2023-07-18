@@ -5,10 +5,10 @@ LDFLAGS += -pthread
 all: memcached 
 
 
-memcached: memcached.o commons/sock.o commons/common.o commons/log.o commons/parser.o hashtable/bst.o hashtable/hash.o
+memcached: memcached.o commons/sock.o commons/common.o commons/log.o commons/parser.o commons/epoll.o hashtable/bst.o hashtable/hash.o
 
 clean:
-	rm -f memcached *.o
+	rm -f memcached *.o commons/*.o hashtable/*.o
 
 
 run: all
@@ -16,8 +16,6 @@ run: all
 
 .deps.mk:
 	$(CC) -MM *.c > .deps.mk
-
-
 
 .PHONY: all clean run
 
