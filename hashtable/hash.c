@@ -1,8 +1,7 @@
 #include <assert.h>
 #include <stdlib.h>
+#include <pthread.h>
 #include "hash.h"
-
-#define SEED 0
 
 static inline uint32_t murmur_32_scramble(uint32_t k) {
     k *= 0xcc9e2d51;
@@ -55,9 +54,8 @@ HashTable hashtable_create(unsigned capacity) {
   assert(table != NULL);
   table->elems = malloc(sizeof(struct _BST) * capacity);
   assert(table->elems != NULL);
-  table->numElems = 0;
-  table->collisions = 0;
   table->capacity = capacity;
+  table->range = capacity / NUM_REGIONS;
   table->comp = (CompareFunction)compare_keys;
   table->destr = (DestructorFunction)free_bst;
   table->hash = (HashFunction)hash_word;
@@ -67,26 +65,12 @@ HashTable hashtable_create(unsigned capacity) {
     table->elems[idx] = NULL;
   }
 
-  return table;
-}
-
-void insert_bst_hashtable (HashTable table, BST bst) {
-  if (bst == NULL) return;
-
-  insert_hashtable(table, bst->key, bst->value);
-  insert_bst_hashtable(table, bst->left);
-  insert_bst_hashtable(table, bst->right);
-}
-
-HashTable rehash_table(HashTable table){
-  HashTable newTable = hashtable_create(table->capacity * 2);
-
-  for(unsigned i=0; i < table->capacity; i++){
-    insert_bst_hashtable(newTable, table->elems[i]);
+  // Inicializamos los locks.
+  for (unsigned idx = 0; idx < NUM_REGIONS; ++idx) {
+    pthread_mutex_init(table->locks+idx, NULL);
   }
 
-  hashtable_destroy(table);
-  return newTable;
+  return table;
 }
 
 HashTable hashtable_destroy(HashTable table) {
@@ -95,6 +79,10 @@ HashTable hashtable_destroy(HashTable table) {
   for (unsigned idx = 0; idx < table->capacity; ++idx)
       table->destr(table->elems[idx]);
 
+  // Destruir cada uno de los locks.
+  for (unsigned idx = 0; idx < NUM_REGIONS; ++idx)
+      pthread_mutex_destroy(table->locks+idx);
+
   // Liberar el arreglo de casillas y la table.
   free(table->elems);
   free(table);
@@ -102,27 +90,33 @@ HashTable hashtable_destroy(HashTable table) {
   return table;
 }
 
-void insert_hashtable(HashTable table, char *key, int value){
+void insert_hashtable(HashTable table, char *key, int value) {
   unsigned idx = table->hash(key) % table->capacity;
 
+  int region = idx / table->range;
+  pthread_mutex_lock(table->locks+region);
   if(table->elems[idx] != NULL){
     table->elems[idx] = insert_bst(table->elems[idx], key, value);
-    table->collisions++;
-  }else{
+  } else {
     table->elems[idx] = new_pair(key, value);
   }
-  table->numElems++;
+  pthread_mutex_unlock(table->locks+region);
 }
 
-int delete_hashtable(HashTable table, char* key){
+int delete_hashtable(HashTable table, char* key) {
   unsigned idx = table->hash(key) % table->capacity;
-  table->numElems -= size(table->elems[idx]);
+  int region = idx / table->range;
+  pthread_mutex_lock(table->locks+region);
   int res = delete_bst(&(table->elems[idx]), key);
-  table->numElems += size(table->elems[idx]);
+  pthread_mutex_unlock(table->locks+region);
   return res;
 }
 
-int search_hashtable(HashTable table, char *key){
+int search_hashtable(HashTable table, char *key) {
   unsigned idx = table->hash(key) % table->capacity;
-  return search_bst(table->elems[idx], key);
+  int region = idx / table->range;
+  pthread_mutex_lock(table->locks+region);
+  int value = search_bst(table->elems[idx], key);
+  pthread_mutex_unlock(table->locks+region);
+  return value;
 }
