@@ -46,7 +46,7 @@ void text_handle(int fd, char *args[3], int nargs){
 		assert(nargs == 3);
         char *key = args[1];
         char *val = args[2];
-        insert_hashtable(table, key, atoi(val));
+        insert_hashtable(table, key, val);
 		char reply[2024];
         sprintf(reply, "OK\n");
 		write(fd, reply, strlen(reply));
@@ -55,10 +55,10 @@ void text_handle(int fd, char *args[3], int nargs){
     if(strcmp(cmd,"GET") == 0){
 		assert(nargs == 2);
         char *key = args[1];
-        int res = search_hashtable(table, key);
+        char* value = search_hashtable(table, key);
 		char reply[2024];
-		if(res != -1)
-        	sprintf(reply, "OK %d\n", res);
+		if(value != NULL)
+        	sprintf(reply, "OK %s\n", value);
 		else
 			sprintf(reply, "ENOTFOUND\n");
 		write(fd, reply, strlen(reply));
@@ -77,6 +77,43 @@ void text_handle(int fd, char *args[3], int nargs){
     } 
 }
 
+int bin_consume(int fd, int blen){
+	char cmd;
+	int nread = READ(fd, &cmd, 1);
+	// log(1, "Comando: %s\n", code_str(cmd));
+	switch (cmd){
+	case PUT:
+		break;
+	case GET:{
+		char lbuf[4];
+		nread = READ(fd, lbuf, 4);
+		int len_net = *(int*)lbuf;
+		int len = ntohl(len_net);
+		// log(1, "Largo: %d\n", len);
+		char* buf = malloc(len+1);
+		nread = READ(fd, buf, len);
+		buf[nread] = '\0';
+		// log(1, "Clave: %s\n", buf);
+		char* value = search_hashtable(table, buf);
+		// log(1, "Valor: %s\n", value);
+		free(buf);
+		char k = OK;
+		len = strlen(value);
+		len_net = htonl(len);
+		write(fd, &k, 1);
+		write(fd, &len_net, 4);
+		write(fd, value, len);
+		break;
+	}
+	case DEL:	break;
+
+	case STATS:	break;
+	default:
+		break;
+	}
+	return 1;
+}
+
 /* 0: todo ok, continua. -1 errores */
 int text_consume(char buf[2024], int fd, int blen)
 {
@@ -89,7 +126,7 @@ int text_consume(char buf[2024], int fd, int blen)
 			return -1;
 		int nread = READ(fd, buf + blen, rem);	
 
-		log(3, "Read %i bytes from fd %i", nread, fd);
+		log(1, "Read %i bytes from fd %i", nread, fd);
 		blen += nread;
 		char *p, *p0 = buf;
 		int nlen = blen;
@@ -99,7 +136,7 @@ int text_consume(char buf[2024], int fd, int blen)
 			/* Mensaje completo */
 			int len = p - p0;
 			*p++ = 0;
-			log(3, "full command: <%s>", p0);
+			log(1, "full command: <%s>", p0);
 			char *toks[3]= {NULL};
 			int lens[3] = {0};
 			int ntok;
@@ -171,17 +208,12 @@ void *thread(void *args) {
 				log(1, "Nuevo Cliente\n");
 				csock = new_client(data->fd);
 				epoll_add(efd, csock, data->mode, EPOLLIN | EPOLLET | EPOLLONESHOT);
-				epoll_mod(efd, text_sock, TEXT, data, EPOLLIN | EPOLLONESHOT);
+				epoll_mod(efd, data->fd, data->mode, data, EPOLLIN | EPOLLONESHOT);
 			} else {
-				log(1, "Nuevo Mensaje\n");
-				
 				char buffer[2024];
-				if(data->mode == TEXT)
-					text_consume(buffer, data->fd, 0);
-				if(data->mode == BIN)
-					log(1, "BINYARIO\n");
-				log(1, "Leyo el mensaje\n");
-				epoll_mod(efd, data->fd, TEXT, data, EPOLLIN | EPOLLET | EPOLLONESHOT);
+				if(data->mode == TEXT) text_consume(buffer, data->fd, 0);
+				if(data->mode == BIN) bin_consume(data->fd, 0);
+				epoll_mod(efd, data->fd, data->mode, data, EPOLLIN | EPOLLET | EPOLLONESHOT);
 			}
 		}
 	}

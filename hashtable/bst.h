@@ -9,7 +9,7 @@
 
 struct _BST{
   char *key;
-  int value;
+  char *value;
   int size;
   struct _BST *left;
   struct _BST *right;
@@ -17,7 +17,7 @@ struct _BST{
 
 typedef struct _BST* BST;
 
-BST new_pair(char *word, int value);
+BST new_pair(char* key, char* value);
 
 /**
  * Retorna 0 si los contactos tienen el mismo nombre.
@@ -34,10 +34,10 @@ BST free_bst(BST node);
 
 BST delete_node(BST node);
 
-BST insert_bst(BST node, char* key, int value);
+BST insert_bst(BST node, char* key, char* value);
 
 int delete_bst(BST* node, char *key);
 
-int search_bst(BST node, char* key);
+char* search_bst(BST node, char* key);
 
 #endif /* __CONTACTO_H__ */

@@ -4,14 +4,16 @@
 /**
  * Crea un nuevo contacto.
  */
-BST new_pair(char *key, int value) {
+BST new_pair(char *key, char *value) {
   BST newNode = malloc(sizeof(struct _BST));
   assert(newNode != NULL);
 
   newNode->key = malloc(sizeof(char) * (strlen(key) + 1));
   assert(newNode->key != NULL);
-  newNode->value = value;
   strcpy(newNode->key, key);
+  newNode->value = malloc(sizeof(char) * (strlen(value) + 1));
+  assert(newNode->value != NULL);
+  strcpy(newNode->value, value);
   newNode->left = NULL;
   newNode->right = NULL;
   newNode->size = 1;
@@ -24,7 +26,7 @@ int size(BST node){
   return node->size;
 }
 
-BST insert_bst(BST node, char* key, int value) {
+BST insert_bst(BST node, char* key, char* value) {
   if (node==NULL) return new_pair(key, value);
 
   int cmp = strcmp(node->key, key);
@@ -70,13 +72,13 @@ int delete_bst(BST* node, char* key){
   return 0;
 }
 
-int search_bst(BST node, char *key){
-  if(node == NULL) return -1;
+char* search_bst(BST node, char *key){
+  if(node == NULL) return NULL;
   int cmp = strcmp(node->key, key);
   if (cmp == 0) return node->value;
   if (cmp > 0 ) return search_bst(node->left, key);
   if (cmp < 0 ) return search_bst(node->right, key);
-  return -1;
+  return NULL;
 }
 
 /**
@@ -92,6 +94,7 @@ int compare_keys(char *k1, char *k2) {
 BST free_bst(BST node) {
     if(node != NULL){
         free(node->key);
+        free(node->value);
         free_bst(node->left);
         free_bst(node->right);
         free(node);

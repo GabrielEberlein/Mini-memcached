@@ -90,7 +90,7 @@ HashTable hashtable_destroy(HashTable table) {
   return table;
 }
 
-void insert_hashtable(HashTable table, char *key, int value) {
+void insert_hashtable(HashTable table, char *key, char *value) {
   unsigned idx = table->hash(key) % table->capacity;
 
   int region = idx / table->range;
@@ -112,11 +112,11 @@ int delete_hashtable(HashTable table, char* key) {
   return res;
 }
 
-int search_hashtable(HashTable table, char *key) {
+char* search_hashtable(HashTable table, char *key) {
   unsigned idx = table->hash(key) % table->capacity;
   int region = idx / table->range;
   pthread_mutex_lock(table->locks+region);
-  int value = search_bst(table->elems[idx], key);
+  char* value = search_bst(table->elems[idx], key);
   pthread_mutex_unlock(table->locks+region);
   return value;
 }
