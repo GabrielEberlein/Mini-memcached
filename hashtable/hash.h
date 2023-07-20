@@ -25,15 +25,13 @@ struct _HashTable {
 };
 typedef struct _HashTable *HashTable;
 
-void insert_hashtable(HashTable table, char *key, char *value);
+void insert_hashtable(HashTable table, char *key, char *value, int keyLen, int valLen);
 
-int delete_hashtable(HashTable table, char *key);
+int delete_hashtable(HashTable table, char *key, int keyLen);
 
-char* search_hashtable(HashTable table, char *key);
+char* search_hashtable(HashTable table, char *key, int keyLen);
 
 HashTable hashtable_create(unsigned capacity);
-
-HashTable rehash_table(HashTable table);
 
 HashTable hashtable_destroy(HashTable tabla);
 

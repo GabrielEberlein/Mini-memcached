@@ -46,7 +46,7 @@ void text_handle(int fd, char *args[3], int nargs){
 		assert(nargs == 3);
         char *key = args[1];
         char *val = args[2];
-        insert_hashtable(table, key, val);
+        insert_hashtable(table, key, val, strlen(key), strlen(val));
 		char reply[2024];
         sprintf(reply, "OK\n");
 		write(fd, reply, strlen(reply));
@@ -55,7 +55,7 @@ void text_handle(int fd, char *args[3], int nargs){
     if(strcmp(cmd,"GET") == 0){
 		assert(nargs == 2);
         char *key = args[1];
-        char* value = search_hashtable(table, key);
+        char* value = search_hashtable(table, key, strlen(key));
 		char reply[2024];
 		if(value != NULL)
         	sprintf(reply, "OK %s\n", value);
@@ -67,7 +67,7 @@ void text_handle(int fd, char *args[3], int nargs){
     if(strcmp(cmd,"DEL") == 0){
 		assert(nargs == 2);
         char *key = args[1];
-        int res = delete_hashtable(table, key);
+        int res = delete_hashtable(table, key, strlen(key));
 		char reply[2024];
         if(res != -1)
         	sprintf(reply, "OK\n");
@@ -80,34 +80,77 @@ void text_handle(int fd, char *args[3], int nargs){
 int bin_consume(int fd, int blen){
 	char cmd;
 	int nread = READ(fd, &cmd, 1);
-	// log(1, "Comando: %s\n", code_str(cmd));
-	switch (cmd){
-	case PUT:
-		break;
-	case GET:{
+	switch (cmd) {
+	case PUT: {
 		char lbuf[4];
 		nread = READ(fd, lbuf, 4);
 		int len_net = *(int*)lbuf;
-		int len = ntohl(len_net);
-		// log(1, "Largo: %d\n", len);
-		char* buf = malloc(len+1);
-		nread = READ(fd, buf, len);
-		buf[nread] = '\0';
-		// log(1, "Clave: %s\n", buf);
-		char* value = search_hashtable(table, buf);
-		// log(1, "Valor: %s\n", value);
-		free(buf);
+		int keyLen = ntohl(len_net);
+		char* key = malloc(keyLen);
+		nread = READ(fd, key, keyLen);
+
+		nread = READ(fd, lbuf, 4);
+		len_net = *(int*)lbuf;
+		int valLen = ntohl(len_net);
+		char* val = malloc(valLen);
+		nread = READ(fd, val, valLen);
+
+		insert_hashtable(table, key, val, keyLen, valLen);
+
+		free(key);
+		free(val);
+
 		char k = OK;
-		len = strlen(value);
-		len_net = htonl(len);
 		write(fd, &k, 1);
-		write(fd, &len_net, 4);
-		write(fd, value, len);
+
 		break;
 	}
-	case DEL:	break;
+	case GET: {
+		char lbuf[4];
+		nread = READ(fd, lbuf, 4);
+		int len_net = *(int*)lbuf;
+		int keyLen = ntohl(len_net);
+		char* key = malloc(keyLen);
+		nread = READ(fd, key, keyLen);
 
-	case STATS:	break;
+		char* value = search_hashtable(table, key, keyLen);
+
+		free(key);
+
+		if(value != NULL) {
+			char k = OK;
+			int valLen = strlen(value);
+			len_net = htonl(valLen);
+			write(fd, &k, 1);
+			write(fd, &len_net, 4);
+			write(fd, value, valLen);
+		} else {
+			char enotfound = ENOTFOUND;
+			write(fd, &enotfound, 1);
+		}
+
+		break;
+	}
+	case DEL: {
+		char lbuf[4];
+		nread = READ(fd, lbuf, 4);
+		int len_net = *(int*)lbuf;
+		int lenKey = ntohl(len_net);
+		char* key = malloc(lenKey);
+		nread = READ(fd, key, lenKey);
+
+		int res = delete_hashtable(table, key, lenKey);
+
+		free(key);
+
+		char reply = res != -1 ? OK : ENOTFOUND;
+		write(fd, &reply, 1);
+
+		break;
+	}
+	case STATS:	
+		break;
+
 	default:
 		break;
 	}
@@ -140,7 +183,7 @@ int text_consume(char buf[2024], int fd, int blen)
 			char *toks[3]= {NULL};
 			int lens[3] = {0};
 			int ntok;
-			ntok = text_parser(p0,toks,lens);
+			ntok = text_parser(p0, toks, lens);
 
 			text_handle(fd, toks, ntok);
 			/*
@@ -180,8 +223,7 @@ void limit_mem(size_t limit)
     }
 }
 
-void handle_signals()
-{
+void handle_signals() {
 	/*Capturar y manejar  SIGPIPE */
 }
 

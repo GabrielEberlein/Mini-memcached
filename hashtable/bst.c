@@ -4,7 +4,7 @@
 /**
  * Crea un nuevo contacto.
  */
-BST new_pair(char *key, char *value) {
+BST new_pair(char *key, char *value, int valLen, int keyLen) {
   BST newNode = malloc(sizeof(struct _BST));
   assert(newNode != NULL);
 
@@ -17,6 +17,8 @@ BST new_pair(char *key, char *value) {
   newNode->left = NULL;
   newNode->right = NULL;
   newNode->size = 1;
+  newNode->keyLen = keyLen;
+  newNode->valLen = valLen;
 
   return newNode;
 }
@@ -26,13 +28,13 @@ int size(BST node){
   return node->size;
 }
 
-BST insert_bst(BST node, char* key, char* value) {
-  if (node==NULL) return new_pair(key, value);
+BST insert_bst(BST node, char* key, char* value, int keyLen, int valLen) {
+  if (node==NULL) return new_pair(key, value, keyLen, valLen);
 
   int cmp = strcmp(node->key, key);
   if (cmp == 0) node->value = value;
-  if (cmp > 0 ) node->left  = insert_bst(node->left, key, value);
-  if (cmp < 0 ) node->right = insert_bst(node->right, key, value);
+  if (cmp > 0 ) node->left  = insert_bst(node->left, key, value, keyLen, valLen);
+  if (cmp < 0 ) node->right = insert_bst(node->right, key, value, keyLen, valLen);
   
   node->size = size(node->left) + size(node->right) + 1;
 
@@ -61,23 +63,23 @@ BST delete_node(BST node){
   return replacement;
 }
 
-int delete_bst(BST* node, char* key){
+int delete_bst(BST* node, char* key, int keyLen){
   if((*node)==NULL) return -1;
   int cmp = strcmp((*node)->key, key);
 
   if (cmp == 0) (*node) = delete_node((*node));
-  if (cmp > 0 ) return delete_bst(&((*node)->left), key);
-  if (cmp < 0 ) return delete_bst(&((*node)->right), key);
+  if (cmp > 0 ) return delete_bst(&((*node)->left), key, keyLen);
+  if (cmp < 0 ) return delete_bst(&((*node)->right), key, keyLen);
 
   return 0;
 }
 
-char* search_bst(BST node, char *key){
+char* search_bst(BST node, char *key, int keyLen){
   if(node == NULL) return NULL;
   int cmp = strcmp(node->key, key);
   if (cmp == 0) return node->value;
-  if (cmp > 0 ) return search_bst(node->left, key);
-  if (cmp < 0 ) return search_bst(node->right, key);
+  if (cmp > 0 ) return search_bst(node->left, key, keyLen);
+  if (cmp < 0 ) return search_bst(node->right, key, keyLen);
   return NULL;
 }
 

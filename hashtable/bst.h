@@ -11,6 +11,8 @@ struct _BST{
   char *key;
   char *value;
   int size;
+  int keyLen;
+  int valLen;
   struct _BST *left;
   struct _BST *right;
 };
@@ -34,10 +36,10 @@ BST free_bst(BST node);
 
 BST delete_node(BST node);
 
-BST insert_bst(BST node, char* key, char* value);
+BST insert_bst(BST node, char* key, char* value, int keyLen, int valLen);
 
-int delete_bst(BST* node, char *key);
+int delete_bst(BST* node, char *key, int keyLen);
 
-char* search_bst(BST node, char* key);
+char* search_bst(BST node, char* key, int keyLen);
 
 #endif /* __CONTACTO_H__ */

@@ -90,33 +90,33 @@ HashTable hashtable_destroy(HashTable table) {
   return table;
 }
 
-void insert_hashtable(HashTable table, char *key, char *value) {
+void insert_hashtable(HashTable table, char *key, char *value, int keyLen, int valLen) {
   unsigned idx = table->hash(key) % table->capacity;
 
   int region = idx / table->range;
   pthread_mutex_lock(table->locks+region);
   if(table->elems[idx] != NULL){
-    table->elems[idx] = insert_bst(table->elems[idx], key, value);
+    table->elems[idx] = insert_bst(table->elems[idx], key, value, keyLen, valLen);
   } else {
     table->elems[idx] = new_pair(key, value);
   }
   pthread_mutex_unlock(table->locks+region);
 }
 
-int delete_hashtable(HashTable table, char* key) {
+int delete_hashtable(HashTable table, char* key, int keyLen) {
   unsigned idx = table->hash(key) % table->capacity;
   int region = idx / table->range;
   pthread_mutex_lock(table->locks+region);
-  int res = delete_bst(&(table->elems[idx]), key);
+  int res = delete_bst(&(table->elems[idx]), key, keyLen);
   pthread_mutex_unlock(table->locks+region);
   return res;
 }
 
-char* search_hashtable(HashTable table, char *key) {
+char* search_hashtable(HashTable table, char *key, int keyLen) {
   unsigned idx = table->hash(key) % table->capacity;
   int region = idx / table->range;
   pthread_mutex_lock(table->locks+region);
-  char* value = search_bst(table->elems[idx], key);
+  char* value = search_bst(table->elems[idx], key, keyLen);
   pthread_mutex_unlock(table->locks+region);
   return value;
 }
