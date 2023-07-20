@@ -16,12 +16,14 @@
 #include "hashtable/hash.h"
 #include "queue/queue.h"
 #include "commons/epoll.h"
+#include "commons/stats.h"
 
 #define MAX_EVENTS 10
 #define MAX_THREADS 5
 
 struct epoll_event events[MAX_EVENTS];
 HashTable table;
+Stats stats;
 Queue* priorityqueue;
 
 struct ThreadArgs{
@@ -42,20 +44,29 @@ struct ThreadArgs{
 void text_handle(int fd, char *args[3], int nargs){
 	char *cmd = args[0];
 	
-    if(strcmp(cmd,"PUT") == 0){
+    if(strcmp(cmd, "PUT") == 0) {
+		increase(stats, PUTS);
+
 		assert(nargs == 3);
         char *key = args[1];
         char *val = args[2];
+
         insert_hashtable(table, key, val, strlen(key), strlen(val));
+		increase(stats, KEYS);
+
 		char reply[2024];
         sprintf(reply, "OK\n");
-		write(fd, reply, strlen(reply));
+		write(fd, reply, 3);
     }
 
-    if(strcmp(cmd,"GET") == 0){
+    if(strcmp(cmd, "GET") == 0) {
+		increase(stats, GETS);
+
 		assert(nargs == 2);
         char *key = args[1];
+
         char* value = search_hashtable(table, key, strlen(key));
+
 		char reply[2024];
 		if(value != NULL)
         	sprintf(reply, "OK %s\n", value);
@@ -64,17 +75,31 @@ void text_handle(int fd, char *args[3], int nargs){
 		write(fd, reply, strlen(reply));
 	}
 
-    if(strcmp(cmd,"DEL") == 0){
+    if(strcmp(cmd, "DEL") == 0){
+		increase(stats, DELS);
+
 		assert(nargs == 2);
         char *key = args[1];
+
         int res = delete_hashtable(table, key, strlen(key));
+
 		char reply[2024];
-        if(res != -1)
+        if(res != -1) {
+			decrease(stats, KEYS);
         	sprintf(reply, "OK\n");
-		else
+		} else 
 			sprintf(reply, "ENOTFOUND\n");
 		write(fd, reply, strlen(reply));
-    } 
+    }
+
+	if(strcmp(cmd, "STATS") == 0) {
+		char reply[2024];
+		sprintf(reply, "OK PUTS: %d GETS: %d DELS: %d KEYS:%d\n", stats->counters[PUTS],
+																  stats->counters[GETS],
+																  stats->counters[DELS],
+																  stats->counters[KEYS]);
+		write(fd, reply, strlen(reply));
+	}
 }
 
 int bin_consume(int fd, int blen){
@@ -82,6 +107,8 @@ int bin_consume(int fd, int blen){
 	int nread = READ(fd, &cmd, 1);
 	switch (cmd) {
 	case PUT: {
+		increase(stats, PUTS);
+
 		char lbuf[4];
 		nread = READ(fd, lbuf, 4);
 		int len_net = *(int*)lbuf;
@@ -96,6 +123,7 @@ int bin_consume(int fd, int blen){
 		nread = READ(fd, val, valLen);
 
 		insert_hashtable(table, key, val, keyLen, valLen);
+		increase(stats, KEYS);
 
 		free(key);
 		free(val);
@@ -106,6 +134,8 @@ int bin_consume(int fd, int blen){
 		break;
 	}
 	case GET: {
+		increase(stats, GETS);
+
 		char lbuf[4];
 		nread = READ(fd, lbuf, 4);
 		int len_net = *(int*)lbuf;
@@ -132,6 +162,8 @@ int bin_consume(int fd, int blen){
 		break;
 	}
 	case DEL: {
+		increase(stats, DELS);
+
 		char lbuf[4];
 		nread = READ(fd, lbuf, 4);
 		int len_net = *(int*)lbuf;
@@ -143,14 +175,28 @@ int bin_consume(int fd, int blen){
 
 		free(key);
 
-		char reply = res != -1 ? OK : ENOTFOUND;
-		write(fd, &reply, 1);
+		if (res != -1) {
+			decrease(stats, KEYS);
+			char k = OK;
+			write(fd, &k, 1);
+		} else {
+			char enotfound = ENOTFOUND;
+			write(fd, &enotfound, 1);
+		}
 
 		break;
 	}
-	case STATS:	
+	case STATS:	{
+		char k = OK;
+		write(fd, &k, 1);
+		char reply[2024];
+		sprintf(reply, "OK PUTS: %d GETS: %d DELS: %d KEYS:%d\n", stats->counters[PUTS],
+																  stats->counters[GETS],
+																  stats->counters[DELS],
+																  stats->counters[KEYS]);
+		write(fd, reply, strlen(reply));
 		break;
-
+	}
 	default:
 		break;
 	}
@@ -297,6 +343,7 @@ int main(int argc, char **argv)
 
 	handle_signals();
 	table = hashtable_create(1<<20);
+	stats = stats_create();
 
 	/*Función que limita la memoria*/
 	//limit_mem(0);

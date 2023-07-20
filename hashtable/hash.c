@@ -98,7 +98,7 @@ void insert_hashtable(HashTable table, char *key, char *value, int keyLen, int v
   if(table->elems[idx] != NULL){
     table->elems[idx] = insert_bst(table->elems[idx], key, value, keyLen, valLen);
   } else {
-    table->elems[idx] = new_pair(key, value);
+    table->elems[idx] = new_pair(key, value, keyLen, valLen);
   }
   pthread_mutex_unlock(table->locks+region);
 }

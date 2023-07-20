@@ -13,13 +13,14 @@ struct _BST{
   int size;
   int keyLen;
   int valLen;
+  int bin;
   struct _BST *left;
   struct _BST *right;
 };
 
 typedef struct _BST* BST;
 
-BST new_pair(char* key, char* value);
+BST new_pair(char* key, char* value, int valLen, int keyLen);
 
 /**
  * Retorna 0 si los contactos tienen el mismo nombre.
