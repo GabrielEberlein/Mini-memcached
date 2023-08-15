@@ -138,7 +138,7 @@ void readn(int fd, void *buf, int len)
 	}
 }
 
-void send_var(int fd, int len, const void *buf)
+void  send_var(int fd, int len, const void *buf)
 {
 	int len_net = htonl(len);
 	writen(fd, &len_net, 4);
@@ -237,21 +237,21 @@ char * input(int *lenp)
 	char *ret = malloc(1024);
 	int off = 0, sz = 1024;
 	int rc;
-    printf("read\n");
-	while ((rc = read(0, ret + off, sz - off)) > 0) {
-		off += rc;
-		if (off == sz) {
-			sz *= 2;
-			ret = realloc(ret, sz);
-		}
-	}
+	scanf("%s[^\n]", ret);
+	// while ((rc = read(0, ret + off, sz - off)) > 0) {
+	// 	off += rc;
+	// 	if (off == sz) {
+	// 		sz *= 2;
+	// 		ret = realloc(ret, sz);
+	// 	}
+	// }
 
-	if (rc < 0)
-		die("input.read?");
+	// if (rc < 0)
+	// 	die("input.read?");
 
-	assert(rc == 0);
+	// assert(rc == 0);
 	/* OK, EOF */
-	*lenp = off;
+	*lenp = strlen(ret);
 	return ret;
 }
 
@@ -264,12 +264,12 @@ void put(const char *k)
 	/* Pedir */
 	{ 
 		int comm = PUT;
+		int lenData;
+		int lenKey = strlen(k);
+		char *buf = input(&lenData);
 		writen(fd, &comm, 1);
-		send_var(fd, strlen(k), k);
-
-		int len;
-		char *buf = input(&len);
-		send_var(fd, len, buf);
+		send_var(fd, lenKey, k);
+		send_var(fd, lenData, buf);
 		free(buf);
 	}
 
@@ -281,7 +281,7 @@ void put(const char *k)
 		if (cod != OK)
 			die("error en pedido, devolvió %i", cod);
 
-		fprintf(stderr, "\nOK\n");
+		fprintf(stderr, "OK\n");
 	}
 }
 

@@ -1,42 +1,45 @@
 #include "bst.h"
+#include "../commons/log.h"
 
 #define SEED 0
-/**
- * Crea un nuevo contacto.
- */
-BST new_pair(char *key, char *value, int valLen, int keyLen) {
+
+String build_string(char* data, int len){
+  String string = malloc(sizeof(struct _String));
+  assert(string != NULL);
+
+  string->data = malloc(sizeof(char) * (len));
+  assert(string->data != NULL);
+  memcpy(string->data, data, len);
+  string->len = len;
+
+  return string;
+}
+
+String free_string(String string){
+  free(string->data);
+  free(string);
+  return NULL;
+}
+
+BST new_pair(String key, String val) {
   BST newNode = malloc(sizeof(struct _BST));
   assert(newNode != NULL);
 
-  newNode->key = malloc(sizeof(char) * (strlen(key) + 1));
-  assert(newNode->key != NULL);
-  strcpy(newNode->key, key);
-  newNode->value = malloc(sizeof(char) * (strlen(value) + 1));
-  assert(newNode->value != NULL);
-  strcpy(newNode->value, value);
+  newNode->key = key;
+  newNode->val = val;
   newNode->left = NULL;
   newNode->right = NULL;
-  newNode->size = 1;
-  newNode->keyLen = keyLen;
-  newNode->valLen = valLen;
 
   return newNode;
 }
 
-int size(BST node){
-  if(node==NULL) return 0;
-  return node->size;
-}
+BST insert_bst(BST node, String key, String val) {
+  if (node==NULL) return new_pair(key, val);
 
-BST insert_bst(BST node, char* key, char* value, int keyLen, int valLen) {
-  if (node==NULL) return new_pair(key, value, keyLen, valLen);
-
-  int cmp = strcmp(node->key, key);
-  if (cmp == 0) node->value = value;
-  if (cmp > 0 ) node->left  = insert_bst(node->left, key, value, keyLen, valLen);
-  if (cmp < 0 ) node->right = insert_bst(node->right, key, value, keyLen, valLen);
-  
-  node->size = size(node->left) + size(node->right) + 1;
+  int cmp = compare_keys(node->key, key);
+  if (cmp == 0) node->val->data = val->data;
+  if (cmp > 0 ) node->left  = insert_bst(node->left, key, val);
+  if (cmp < 0 ) node->right = insert_bst(node->right, key, val);
 
   return node;
 }
@@ -48,13 +51,11 @@ BST delete_node(BST node){
     replacement = node->left;
     while(replacement->right){ 
       prev = replacement;
-      prev->size--;
       replacement = replacement->right;
     }
     if(prev) prev->right = replacement->left;
     replacement->left = node->left;
     replacement->right = node->right;
-    replacement->size = replacement->left->size + replacement->right->size + 1;
   }else{
     replacement = node->right;
   }
@@ -63,31 +64,32 @@ BST delete_node(BST node){
   return replacement;
 }
 
-int delete_bst(BST* node, char* key, int keyLen){
+int delete_bst(BST* node, String key){
   if((*node)==NULL) return -1;
-  int cmp = strcmp((*node)->key, key);
+  int cmp = compare_keys((*node)->key, key);
 
   if (cmp == 0) (*node) = delete_node((*node));
-  if (cmp > 0 ) return delete_bst(&((*node)->left), key, keyLen);
-  if (cmp < 0 ) return delete_bst(&((*node)->right), key, keyLen);
+  if (cmp > 0 ) return delete_bst(&((*node)->left), key);
+  if (cmp < 0 ) return delete_bst(&((*node)->right), key);
 
   return 0;
 }
 
-char* search_bst(BST node, char *key, int keyLen){
+String search_bst(BST node, String key){
   if(node == NULL) return NULL;
-  int cmp = strcmp(node->key, key);
-  if (cmp == 0) return node->value;
-  if (cmp > 0 ) return search_bst(node->left, key, keyLen);
-  if (cmp < 0 ) return search_bst(node->right, key, keyLen);
+  int cmp = compare_keys(key, node->key);
+  if (cmp == 0) return node->val;
+  if (cmp < 0 ) return search_bst(node->left, key);
+  if (cmp > 0 ) return search_bst(node->right, key);
   return NULL;
 }
 
 /**
  * Retorna 0 si los contactos tienen la misma palabra.
  */
-int compare_keys(char *k1, char *k2) {
-  return strcmp(k1, k2);
+int compare_keys(String k1, String k2) {
+  if (k1->len != k2->len) return k1->len - k2->len;
+  return memcmp(k1->data, k2->data, k1->len);
 }
 
 /**
@@ -95,8 +97,8 @@ int compare_keys(char *k1, char *k2) {
  */
 BST free_bst(BST node) {
     if(node != NULL){
-        free(node->key);
-        free(node->value);
+        free_string(node->key);
+        free_string(node->val);
         free_bst(node->left);
         free_bst(node->right);
         free(node);

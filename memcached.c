@@ -44,9 +44,10 @@ void text_handle(int fd, char *args[3], int nargs){
 	
     if(strcmp(cmd,"PUT") == 0){
 		assert(nargs == 3);
-        char *key = args[1];
-        char *val = args[2];
-        insert_hashtable(table, key, val, strlen(key), strlen(val));
+		String key = build_string(args[1], strlen(args[1]));
+		log(1, "Data: %s, Key: %d\n", key->data, key->len);
+		String val = build_string(args[2], strlen(args[2]));
+        insert_hashtable(table, key, val);
 		char reply[2024];
         sprintf(reply, "OK\n");
 		write(fd, reply, strlen(reply));
@@ -54,20 +55,22 @@ void text_handle(int fd, char *args[3], int nargs){
 
     if(strcmp(cmd,"GET") == 0){
 		assert(nargs == 2);
-        char *key = args[1];
-        char* value = search_hashtable(table, key, strlen(key));
+		String key = build_string(args[1], strlen(args[1]));
+        String val = search_hashtable(table, key);
 		char reply[2024];
-		if(value != NULL)
-        	sprintf(reply, "OK %s\n", value);
+		if(val != NULL){
+        	write(fd, "OK ", 3);
+			write(fd, val->data, val->len);
+			write(fd,"\n",1);
+		}
 		else
-			sprintf(reply, "ENOTFOUND\n");
-		write(fd, reply, strlen(reply));
+			write(fd, "ENOTFOUND\n", 10);
 	}
 
     if(strcmp(cmd,"DEL") == 0){
 		assert(nargs == 2);
-        char *key = args[1];
-        int res = delete_hashtable(table, key, strlen(key));
+        String key = build_string(args[1], strlen(args[1]));
+        int res = delete_hashtable(table, key);
 		char reply[2024];
         if(res != -1)
         	sprintf(reply, "OK\n");
@@ -82,23 +85,22 @@ int bin_consume(int fd, int blen){
 	int nread = READ(fd, &cmd, 1);
 	switch (cmd) {
 	case PUT: {
-		char lbuf[4];
-		nread = READ(fd, lbuf, 4);
-		int len_net = *(int*)lbuf;
+		int len_net;
+		nread = READ(fd, &len_net, 4);
 		int keyLen = ntohl(len_net);
-		char* key = malloc(keyLen);
-		nread = READ(fd, key, keyLen);
+		char* keyData = malloc(keyLen);
+		nread = READ(fd, keyData, keyLen);
+		String key = build_string(keyData, nread);
+		free(keyData);
 
-		nread = READ(fd, lbuf, 4);
-		len_net = *(int*)lbuf;
+		nread = READ(fd, &len_net, 4);
 		int valLen = ntohl(len_net);
-		char* val = malloc(valLen);
-		nread = READ(fd, val, valLen);
+		char* valData = malloc(valLen);
+		nread = READ(fd, valData, valLen);
+		String val = build_string(valData, nread);
+		free(valData);
 
-		insert_hashtable(table, key, val, keyLen, valLen);
-
-		free(key);
-		free(val);
+		insert_hashtable(table, key, val);
 
 		char k = OK;
 		write(fd, &k, 1);
@@ -106,24 +108,25 @@ int bin_consume(int fd, int blen){
 		break;
 	}
 	case GET: {
-		char lbuf[4];
-		nread = READ(fd, lbuf, 4);
-		int len_net = *(int*)lbuf;
+		log(1, "GETTEANDO\n");
+		int len_net;
+		nread = READ(fd, &len_net, 4);
 		int keyLen = ntohl(len_net);
-		char* key = malloc(keyLen);
-		nread = READ(fd, key, keyLen);
+		char* keyData = malloc(keyLen);
+		nread = READ(fd, keyData, keyLen);
+		log(1,"Previo. Key: %s, len: %d",keyData, keyLen);
+		String key = build_string(keyData, keyLen);
+		free(keyData);
+		log(1,"Key: %s, len: %d",key->data, key->len);
 
-		char* value = search_hashtable(table, key, keyLen);
-
-		free(key);
+		String value = search_hashtable(table, key);
 
 		if(value != NULL) {
 			char k = OK;
-			int valLen = strlen(value);
-			len_net = htonl(valLen);
+			len_net = htonl(value->len);
 			write(fd, &k, 1);
 			write(fd, &len_net, 4);
-			write(fd, value, valLen);
+			write(fd, value->data, value->len);
 		} else {
 			char enotfound = ENOTFOUND;
 			write(fd, &enotfound, 1);
@@ -135,13 +138,13 @@ int bin_consume(int fd, int blen){
 		char lbuf[4];
 		nread = READ(fd, lbuf, 4);
 		int len_net = *(int*)lbuf;
-		int lenKey = ntohl(len_net);
-		char* key = malloc(lenKey);
-		nread = READ(fd, key, lenKey);
+		int keyLen = ntohl(len_net);
+		char* keyData = malloc(keyLen);
+		nread = READ(fd, keyData, keyLen);
+		String key = build_string(keyData, keyLen);
+		free(keyData);
 
-		int res = delete_hashtable(table, key, lenKey);
-
-		free(key);
+		int res = delete_hashtable(table, key);
 
 		char reply = res != -1 ? OK : ENOTFOUND;
 		write(fd, &reply, 1);
