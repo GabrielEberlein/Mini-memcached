@@ -138,7 +138,7 @@ void readn(int fd, void *buf, int len)
 	}
 }
 
-void  send_var(int fd, int len, const void *buf)
+void send_var(int fd, int len, const void *buf)
 {
 	int len_net = htonl(len);
 	writen(fd, &len_net, 4);

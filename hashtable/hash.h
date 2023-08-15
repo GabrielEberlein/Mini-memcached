@@ -37,5 +37,5 @@ HashTable hashtable_destroy(HashTable tabla);
 
 HashTable hash_dictionary(char **dictionary, unsigned wordAmount, unsigned scalar);
 
-unsigned hash_word(char *word);
+unsigned hash_word(String word);
 #endif

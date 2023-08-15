@@ -35,8 +35,9 @@ struct ThreadArgs{
 	int rc = read(fd, buf, n);					\
 	if (rc < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))	\
 		return 0;						\
-	if (rc <= 0)							\
-		return -1;						\
+	if (rc <= 0){							\
+		close(fd);						\
+		return -1;}						\
 	rc; })
 
 void text_handle(int fd, char *args[3], int nargs){
@@ -91,6 +92,7 @@ int bin_consume(int fd, int blen){
 		char* keyData = malloc(keyLen);
 		nread = READ(fd, keyData, keyLen);
 		String key = build_string(keyData, nread);
+		log(1, "Data: %s, Key: %d\n", keyData, keyLen);
 		free(keyData);
 
 		nread = READ(fd, &len_net, 4);
@@ -114,7 +116,6 @@ int bin_consume(int fd, int blen){
 		int keyLen = ntohl(len_net);
 		char* keyData = malloc(keyLen);
 		nread = READ(fd, keyData, keyLen);
-		log(1,"Previo. Key: %s, len: %d",keyData, keyLen);
 		String key = build_string(keyData, keyLen);
 		free(keyData);
 		log(1,"Key: %s, len: %d",key->data, key->len);
@@ -171,7 +172,6 @@ int text_consume(char buf[2024], int fd, int blen)
 		if (rem == 0)
 			return -1;
 		int nread = READ(fd, buf + blen, rem);	
-
 		log(1, "Read %i bytes from fd %i", nread, fd);
 		blen += nread;
 		char *p, *p0 = buf;
@@ -250,15 +250,17 @@ void *thread(void *args) {
 			Data* data = events[i].data.ptr;
 			
 			if(data->fd == text_sock || data->fd == bin_sock) {
-				log(1, "Nuevo Cliente\n");
 				csock = new_client(data->fd);
+				log(1, "Nuevo Cliente id:%d\n", csock);
 				epoll_add(efd, csock, data->mode, EPOLLIN | EPOLLET | EPOLLONESHOT);
 				epoll_mod(efd, data->fd, data->mode, data, EPOLLIN | EPOLLONESHOT);
 			} else {
 				char buffer[2024];
-				if(data->mode == TEXT) text_consume(buffer, data->fd, 0);
-				if(data->mode == BIN) bin_consume(data->fd, 0);
-				epoll_mod(efd, data->fd, data->mode, data, EPOLLIN | EPOLLET | EPOLLONESHOT);
+				log(1, "Im all up in this motherfucker, id:%d\n", data->fd);
+				int r;
+				if(data->mode == TEXT) r = text_consume(buffer, data->fd, 0);
+				if(data->mode == BIN) r = bin_consume(data->fd, 0);
+				if(r != -1) epoll_mod(efd, data->fd, data->mode, data, EPOLLIN | EPOLLET | EPOLLONESHOT);
 			}
 		}
 	}

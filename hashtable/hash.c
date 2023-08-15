@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include "hash.h"
+#include "../commons/log.h"
 
 static inline uint32_t murmur_32_scramble(uint32_t k) {
     k *= 0xcc9e2d51;
@@ -44,8 +45,8 @@ uint32_t murmur3_32(const uint8_t* key, size_t len, uint32_t seed)
 	return h;
 }
 
-unsigned hash_word(char *word) {
-  return murmur3_32((uint8_t*) word, strlen(word), SEED);
+unsigned hash_word(String word) {
+  return murmur3_32((uint8_t*) word->data, word->len, SEED);
 }
 
 HashTable hashtable_create(unsigned capacity) {
@@ -91,8 +92,8 @@ HashTable hashtable_destroy(HashTable table) {
 }
 
 void insert_hashtable(HashTable table, String key, String val) {
-  unsigned idx = table->hash(key->data) % table->capacity;
-
+  unsigned idx = table->hash(key) % table->capacity;
+  log(1,"Hash: %d",idx);
   int region = idx / table->range;
   pthread_mutex_lock(table->locks+region);
   if(table->elems[idx] != NULL){
@@ -104,7 +105,7 @@ void insert_hashtable(HashTable table, String key, String val) {
 }
 
 int delete_hashtable(HashTable table, String key) {
-  unsigned idx = table->hash(key->data) % table->capacity;
+  unsigned idx = table->hash(key) % table->capacity;
   int region = idx / table->range;
   pthread_mutex_lock(table->locks+region);
   int res = delete_bst(&(table->elems[idx]), key);
@@ -113,7 +114,8 @@ int delete_hashtable(HashTable table, String key) {
 }
 
 String search_hashtable(HashTable table, String key) {
-  unsigned idx = table->hash(key->data) % table->capacity;
+  unsigned idx = table->hash(key) % table->capacity;
+  log(1,"Hash: %d",idx);
   int region = idx / table->range;
   pthread_mutex_lock(table->locks+region);
   String value = search_bst(table->elems[idx], key);
