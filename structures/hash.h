@@ -15,7 +15,7 @@ typedef unsigned (*HashFunction)(void *data);
 /** Retorna un entero sin signo para el dato */
 
 struct _HashTable {
-  BST *elems;
+  Node *elems;
   pthread_mutex_t locks[NUM_REGIONS];
   unsigned capacity;
   unsigned range;
@@ -25,11 +25,11 @@ struct _HashTable {
 };
 typedef struct _HashTable *HashTable;
 
-void insert_hashtable(HashTable table, String key, String val);
+void insert_hashtable(Queue* queue, HashTable table, String key, String val);
 
-int delete_hashtable(HashTable table, String key);
+int delete_hashtable(Queue* queue, HashTable table, String key);
 
-String search_hashtable(HashTable table, String key);
+String search_hashtable(Queue* queue, HashTable table, String key);
 
 HashTable hashtable_create(unsigned capacity);
 

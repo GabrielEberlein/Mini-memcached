@@ -13,8 +13,8 @@
 #include "commons/sock.h"
 #include "commons/common.h"
 #include "commons/parser.h"
-#include "hashtable/hash.h"
-#include "queue/queue.h"
+#include "structures/hash.h"
+#include "structures/queue.h"
 #include "commons/epoll.h"
 
 #define MAX_EVENTS 10
@@ -48,7 +48,7 @@ void text_handle(int fd, char *args[3], int nargs){
 		String key = build_string(args[1], strlen(args[1]));
 		log(1, "Data: %s, Key: %d\n", key->data, key->len);
 		String val = build_string(args[2], strlen(args[2]));
-        insert_hashtable(table, key, val);
+        insert_hashtable(priorityqueue, table, key, val);
 		char reply[2024];
         sprintf(reply, "OK\n");
 		write(fd, reply, strlen(reply));
@@ -57,7 +57,7 @@ void text_handle(int fd, char *args[3], int nargs){
     if(strcmp(cmd,"GET") == 0){
 		assert(nargs == 2);
 		String key = build_string(args[1], strlen(args[1]));
-        String val = search_hashtable(table, key);
+        String val = search_hashtable(priorityqueue, table, key);
 		char reply[2024];
 		if(val != NULL){
         	write(fd, "OK ", 3);
@@ -71,7 +71,7 @@ void text_handle(int fd, char *args[3], int nargs){
     if(strcmp(cmd,"DEL") == 0){
 		assert(nargs == 2);
         String key = build_string(args[1], strlen(args[1]));
-        int res = delete_hashtable(table, key);
+        int res = delete_hashtable(priorityqueue, table, key);
 		char reply[2024];
         if(res != -1)
         	sprintf(reply, "OK\n");
@@ -79,6 +79,18 @@ void text_handle(int fd, char *args[3], int nargs){
 			sprintf(reply, "ENOTFOUND\n");
 		write(fd, reply, strlen(reply));
     } 
+
+	if(priorityqueue->first && priorityqueue->last){
+		char* buf=malloc(2024);
+		char* buf2=malloc(2024);
+		Node node = priorityqueue->first;
+		while(node){
+			strncpy(buf2, node->key->data, node->key->len);
+			buf = strcat(buf,buf2);
+			node = node->prev;
+		}
+		log(1, "Queue: %s", buf);
+	}
 }
 
 int bin_consume(int fd, int blen){
@@ -102,7 +114,7 @@ int bin_consume(int fd, int blen){
 		String val = build_string(valData, nread);
 		free(valData);
 
-		insert_hashtable(table, key, val);
+		insert_hashtable(priorityqueue, table, key, val);
 
 		char k = OK;
 		write(fd, &k, 1);
@@ -120,7 +132,7 @@ int bin_consume(int fd, int blen){
 		free(keyData);
 		log(1,"Key: %s, len: %d",key->data, key->len);
 
-		String value = search_hashtable(table, key);
+		String value = search_hashtable(priorityqueue, table, key);
 
 		if(value != NULL) {
 			char k = OK;
@@ -145,7 +157,7 @@ int bin_consume(int fd, int blen){
 		String key = build_string(keyData, keyLen);
 		free(keyData);
 
-		int res = delete_hashtable(table, key);
+		int res = delete_hashtable(priorityqueue, table, key);
 
 		char reply = res != -1 ? OK : ENOTFOUND;
 		write(fd, &reply, 1);
@@ -256,7 +268,6 @@ void *thread(void *args) {
 				epoll_mod(efd, data->fd, data->mode, data, EPOLLIN | EPOLLONESHOT);
 			} else {
 				char buffer[2024];
-				log(1, "Im all up in this motherfucker, id:%d\n", data->fd);
 				int r;
 				if(data->mode == TEXT) r = text_consume(buffer, data->fd, 0);
 				if(data->mode == BIN) r = bin_consume(data->fd, 0);
@@ -302,6 +313,7 @@ int main(int argc, char **argv)
 
 	handle_signals();
 	table = hashtable_create(1<<20);
+	priorityqueue = create_queue();
 
 	/*Función que limita la memoria*/
 	//limit_mem(0);

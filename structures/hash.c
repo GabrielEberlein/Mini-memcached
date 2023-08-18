@@ -53,18 +53,13 @@ HashTable hashtable_create(unsigned capacity) {
   // Pedimos memoria para la estructura principal y las casillas.
   HashTable table = malloc(sizeof(struct _HashTable));
   assert(table != NULL);
-  table->elems = malloc(sizeof(struct _BST) * capacity);
+  table->elems = calloc(capacity, sizeof(struct _Node));
   assert(table->elems != NULL);
   table->capacity = capacity;
   table->range = capacity / NUM_REGIONS;
   table->comp = (CompareFunction)compare_keys;
   table->destr = (DestructorFunction)free_bst;
   table->hash = (HashFunction)hash_word;
-
-  // Inicializamos las casillas con datos nulos.
-  for (unsigned idx = 0; idx < capacity; ++idx) {
-    table->elems[idx] = NULL;
-  }
 
   // Inicializamos los locks.
   for (unsigned idx = 0; idx < NUM_REGIONS; ++idx) {
@@ -91,34 +86,30 @@ HashTable hashtable_destroy(HashTable table) {
   return table;
 }
 
-void insert_hashtable(HashTable table, String key, String val) {
+void insert_hashtable(Queue* queue, HashTable table, String key, String val) {
   unsigned idx = table->hash(key) % table->capacity;
   log(1,"Hash: %d",idx);
   int region = idx / table->range;
   pthread_mutex_lock(table->locks+region);
-  if(table->elems[idx] != NULL){
-    table->elems[idx] = insert_bst(table->elems[idx], key, val);
-  } else {
-    table->elems[idx] = new_pair(key, val);
-  }
+  table->elems[idx] = insert_bst(queue, table->elems[idx], key, val);
   pthread_mutex_unlock(table->locks+region);
 }
 
-int delete_hashtable(HashTable table, String key) {
+int delete_hashtable(Queue* queue, HashTable table, String key) {
   unsigned idx = table->hash(key) % table->capacity;
   int region = idx / table->range;
   pthread_mutex_lock(table->locks+region);
-  int res = delete_bst(&(table->elems[idx]), key);
+  int res = delete_bst(queue, &(table->elems[idx]), key);
   pthread_mutex_unlock(table->locks+region);
   return res;
 }
 
-String search_hashtable(HashTable table, String key) {
+String search_hashtable(Queue* queue, HashTable table, String key) {
   unsigned idx = table->hash(key) % table->capacity;
   log(1,"Hash: %d",idx);
   int region = idx / table->range;
   pthread_mutex_lock(table->locks+region);
-  String value = search_bst(table->elems[idx], key);
+  String value = search_bst(queue, table->elems[idx], key);
   pthread_mutex_unlock(table->locks+region);
   return value;
 }
