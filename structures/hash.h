@@ -2,6 +2,8 @@
 #define __HASH_H_
 
 #include "bst.h"
+#include "stats.h"
+
 #define SEED 0
 #define NUM_REGIONS 1000
 
@@ -16,6 +18,7 @@ typedef unsigned (*HashFunction)(void *data);
 
 struct _HashTable {
   Node *elems;
+  Stats *stats;
   pthread_mutex_t locks[NUM_REGIONS];
   unsigned capacity;
   unsigned range;

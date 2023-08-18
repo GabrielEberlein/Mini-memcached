@@ -43,7 +43,8 @@ struct ThreadArgs{
 void text_handle(int fd, char *args[3], int nargs){
 	char *cmd = args[0];
 	
-    if(strcmp(cmd,"PUT") == 0){
+    if(strcmp(cmd,"PUT") == 0) {
+		stats_inc(table->stats, 0);
 		assert(nargs == 3);
 		String key = build_string(args[1], strlen(args[1]));
 		log(1, "Data: %s, Key: %d\n", key->data, key->len);
@@ -54,7 +55,8 @@ void text_handle(int fd, char *args[3], int nargs){
 		write(fd, reply, strlen(reply));
     }
 
-    if(strcmp(cmd,"GET") == 0){
+    if(strcmp(cmd,"GET") == 0) {
+		stats_inc(table->stats, 1);
 		assert(nargs == 2);
 		String key = build_string(args[1], strlen(args[1]));
         String val = search_hashtable(priorityqueue, table, key);
@@ -68,16 +70,25 @@ void text_handle(int fd, char *args[3], int nargs){
 			write(fd, "ENOTFOUND\n", 10);
 	}
 
-    if(strcmp(cmd,"DEL") == 0){
+    if(strcmp(cmd,"DEL") == 0) {
+		stats_inc(table->stats, 2);
 		assert(nargs == 2);
         String key = build_string(args[1], strlen(args[1]));
         int res = delete_hashtable(priorityqueue, table, key);
 		char reply[2024];
         if(res != -1)
         	sprintf(reply, "OK\n");
+			stats_dec(table->stats, 2);
 		else
 			sprintf(reply, "ENOTFOUND\n");
 		write(fd, reply, strlen(reply));
+    } 
+
+	if(strcmp(cmd,"STATS") == 0) {
+		assert(nargs == 2);
+		char reply[2024];
+		int len = snprintf(reply, 0, "PUTS=%d GETS=%d DELS=%d KEYS=%d", table->stats[0], table->stats[1], table->stats[2], table->stats[3]);
+		write(fd, reply, len);
     } 
 
 	if(priorityqueue->first && priorityqueue->last){
@@ -98,6 +109,7 @@ int bin_consume(int fd, int blen){
 	int nread = READ(fd, &cmd, 1);
 	switch (cmd) {
 	case PUT: {
+		stats_inc(table->stats, 0);
 		int len_net;
 		nread = READ(fd, &len_net, 4);
 		int keyLen = ntohl(len_net);
@@ -115,14 +127,15 @@ int bin_consume(int fd, int blen){
 		free(valData);
 
 		insert_hashtable(priorityqueue, table, key, val);
+		stats_inc(table->stats, 3);
 
 		char k = OK;
 		write(fd, &k, 1);
-
 		break;
 	}
 	case GET: {
 		log(1, "GETTEANDO\n");
+		stats_inc(table->stats, 1);
 		int len_net;
 		nread = READ(fd, &len_net, 4);
 		int keyLen = ntohl(len_net);
@@ -148,6 +161,7 @@ int bin_consume(int fd, int blen){
 		break;
 	}
 	case DEL: {
+		stats_inc(table->stats, 2);
 		char lbuf[4];
 		nread = READ(fd, lbuf, 4);
 		int len_net = *(int*)lbuf;
@@ -159,13 +173,25 @@ int bin_consume(int fd, int blen){
 
 		int res = delete_hashtable(priorityqueue, table, key);
 
-		char reply = res != -1 ? OK : ENOTFOUND;
+		char reply;
+		if (res != -1) {
+			reply = OK;
+			void stats_dec(table->stats, 2);
+		} else reply = ENOTFOUND;
+
 		write(fd, &reply, 1);
 
 		break;
 	}
+
 	case STATS:	
-		break;
+		int[NUM_STATS] = stats_ret(table->stats);
+		char reply = OK, buffer[2024];
+		write(fd, &reply, 1);
+		int len = snprintf(buffer, 0, "PUTS=%d GETS=%d DELS=%d KEYS=%d", table->stats[0], table->stats[1], table->stats[2], table->stats[3]);
+		int len_net = htonl(len);
+		write(fd, &len_net, 4);
+		write(fd, buffer, len);
 
 	default:
 		break;

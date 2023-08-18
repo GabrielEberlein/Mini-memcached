@@ -56,6 +56,7 @@ HashTable hashtable_create(unsigned capacity) {
   table->elems = calloc(capacity, sizeof(struct _Node));
   assert(table->elems != NULL);
   table->capacity = capacity;
+  table->stats = stats_init();
   table->range = capacity / NUM_REGIONS;
   table->comp = (CompareFunction)compare_keys;
   table->destr = (DestructorFunction)free_bst;
@@ -79,6 +80,7 @@ HashTable hashtable_destroy(HashTable table) {
   for (unsigned idx = 0; idx < NUM_REGIONS; ++idx)
       pthread_mutex_destroy(table->locks+idx);
 
+  stats_destroy(table->stats);
   // Liberar el arreglo de casillas y la table.
   free(table->elems);
   free(table);

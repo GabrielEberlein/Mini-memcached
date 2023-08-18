@@ -1,160 +1,76 @@
 -module(client).
--export([start/1, put/3, del/2, get/2, stats/1]).
--export([text_client/1, bin_client/1]).
--export([task_to_text/1, parse_text/1, get_length/1, task_to_bin/1, parse_bin/1]).
+-export([start/1, put/3, get/2, del/2, stats/1]).
+-export([parse/1, handle_receive/2]).
 
--define(TextPort, 8888).
--define(BinPort, 8889). 
+-define(PUT, <<11>>).
+-define(DEL, <<12>>).
+-define(GET, <<13>>).
+-define(STATS, <<21>>).
 
-start(ServerPort) ->
-    {ok, ServerSocket} = gen_tcp:connect("localhost", ServerPort, [{active, true}]),
-    case ServerPort of
-        ?TextPort ->
-            ClientPid = spawn(text_client(ServerSocket)),
-            {ok, ClientPid};
-        ?BinPort ->  
-            ClientPid = bin,
-            {ok, ClientPid};
+-define(OK, <<101>>).
+-define(EINVAL, <<111>>).
+-define(ENOTFOUND, <<112>>).
+-define(EBINARY, <<113>>).
+-define(EBIG,<<114>>).
+-define(EUNK,<<115>>).
+
+start(ServerPort) -> gen_tcp:connect("localhost", ServerPort, [{active, true}]).
+
+parse(X) ->
+    Bin = term_to_binary(X),
+    BinLength = byte_size(Bin),
+    <<BinLength:32, Bin/binary>>.   
+
+parse_response(Socket, Task) ->
+    case Task of
+        put -> ok;
+        del -> ok;
         _ ->
-            {error, "Unspecified Port"}
+            case gen_tcp:recv(Socket, 4) of
+                {ok, Data} -> 
+                    <<Length:32/integer-big>> = Data,
+                    case gen_tcp:recv(Socket, Length) of
+                        {ok, Data} -> 
+                            case Task of
+                                get -> {ok, binary_to_term(Data)};
+                                stats -> {ok, binary_to_list(Data)}
+                            end;
+                        {error, Type} -> Type
+                    end;
+                {error, Type} -> Type
+            end
     end.
 
-task_to_text(Task) ->
-    case lists:head(Task) of
-        put ->
-            io_lib:format("PUT ~p ~p", [lists:nth(2, Task), lists:nth(3, Task)]);
-        del ->
-            io_lib:format("DEL ~p", [lists:nth(2, Task)]);
-        get ->
-            io_lib:format("GET ~p", [lists:nth(2, Task)]);
-        stats ->
-            io_lib:format("STATS")
-    end.
-
-parse_text(Reply) ->
-    Chunks = string:tokens(Reply, [$\s]),
-    case lists:head(Chunks) of
-        "OK" -> 
-            case length(Chunks) of
-                1 -> ok;
-                _ -> {ok, lists:nthtail(1, Chunks)}
+handle_receive(Socket, Task) ->
+    case gen_tcp:recv(Socket, 1) of
+        {ok, Data} -> 
+            case Data of
+                ?OK -> parse_response(Socket, Task);
+                ?EINVAL -> einval;
+                ?ENOTFOUND -> enotfound;
+                ?EBINARY -> ebinary;
+                ?EBIG -> ebig;
+                ?EUNK -> eunk
             end;
-        "EINVAL" -> einval;
-        "ENOTFOUND" -> enotfound;
-        "EBINARY" -> ebinary;
-        "EBIG" -> ebig;
-        "EUNK" -> eunk
+        {error, Type} -> Type
     end.
 
-text_client(ServerSocket) ->
-    receive
-        {Task, Pid} ->
-            Msg = task_to_text(Task),
-            gen_tcp:send(ServerSocket, Msg),
-            receive 
-                {tcp, ServerSocket, TextReply} -> 
-                    Reply = parse_text(TextReply),
-                    Pid ! Reply
-            end;
-        _ ->
-            {error, ""}
-    end,
-    text_client(ServerSocket).
+put(Client, Key, Value) ->
+    ParsedKey = parse(Key),
+    ParsedValue = parse(Value),
+    gen_tcp:send(Client, <<?PUT/binary, ParsedKey/binary, ParsedValue/binary>>),
+    handle_receive(Client, put).
 
-get_length(Length) ->
-    if
-        Length >= 256 ->
-            integer_to_list(get_length(Length div 256))++integer_to_list((Length rem 256));
-        true ->
-            Length
-    end.
+get(Client, Key) ->
+    ParsedKey = parse(Key),
+    gen_tcp:send(Client, <<?GET/binary, ParsedKey/binary>>),
+    handle_receive(Client, get).
 
-task_to_bin(Task) ->
-    case lists:head(Task) of
-        put ->
-            BinTask = integer_to_list(11),
-            LengthKey = get_length(length(lists:nth(2, Task))),
-            LengthValue = get_length(length(lists:nth(3, Task))),
-            list_to_binary(BinTask++LengthKey++(lists:nth(2, Task))++LengthValue++(lists:nth(3, Task)));
-        del ->
-            BinTask = integer_to_list(12),
-            LengthKey = get_length(length(lists:nth(2, Task))),
-            list_to_binary(BinTask++LengthKey++(lists:nth(2, Task)));
-        get ->
-            BinTask = integer_to_list(13),
-            LengthKey = get_length(length(lists:nth(2, Task))),
-            list_to_binary(BinTask++LengthKey++(lists:nth(2, Task)));
-        stats ->
-            BinTask = integer_to_list(21),
-            list_to_binary(BinTask)
-    end.
+del(Client, Key) ->
+    ParsedKey = parse(Key),
+    gen_tcp:send(Client, <<?DEL/binary, ParsedKey/binary>>),
+    handle_receive(Client, del).
 
-separate([]) -> [];
-separate(List) ->
-    Length = list_to_integer(lists:nth(1, List)) * math:pow(256, 3) +
-             list_to_integer(lists:nth(2, List)) * math:pow(256, 2) +
-             list_to_integer(lists:nth(3, List)) * math:pow(256, 1) + 
-             list_to_integer(lists:nth(4, List)) * math:pow(256, 0),
-    String = lists:sublist(5, Length),
-    String++(lists:nthtail(Length+1, List)).
-
-parse_bin(Reply) ->
-    Chunks = binary_to_list(Reply),
-    case lists:head(Chunks) of
-        "101" -> 
-            case length(Chunks) of
-                1 -> ok;
-                _ -> 
-                    {ok, separate(lists:nthtail(1, Chunks))}
-            end;
-        "111" -> einval;
-        "112" -> enotfound;
-        "113" -> ebinary;
-        "114" -> ebig;
-        "115" -> eunk
-    end.
-
-
-bin_client(ServerSocket) ->
-    receive
-        {Task, Pid} ->
-            Msg = task_to_bin(Task),
-            gen_tcp:send(ServerSocket, Msg),
-            receive 
-                {tcp, ServerSocket, BinReply} -> 
-                    Reply = parse_bin(BinReply),
-                    Pid ! Reply
-            end;
-        _ ->
-            {error, ""}
-    end,
-    text_client(ServerSocket).
-
-put(ClientPid, Key, Value) ->
-    ClientPid ! [put, Key, Value],
-    receive
-        ok -> ok;
-        _ -> error
-    end.
-
-get(ClientPid, Key) ->
-    ClientPid ! [get, Key],
-    receive
-        {ok, Value} -> {ok, Value};
-        _ -> error
-    end.
-
-del(ClientPid, Key) ->
-    ClientPid ! [del, Key],
-    receive
-        {ok, Value} -> {ok, Value};
-        _ -> error
-    end.
-
-stats(ClientPid) ->
-    ClientPid ! [stats],
-    receive
-        {ok, List} -> {ok, List};
-        _ -> error
-    end.
-
+stats(Client) ->
+    gen_tcp:send(Client, ?STATS),
+    handle_receive(Client, stats).
