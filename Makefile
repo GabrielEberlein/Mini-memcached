@@ -5,7 +5,7 @@ LDFLAGS += -pthread
 all: memcached 
 
 
-memcached: memcached.o commons/sock.o commons/common.o commons/log.o commons/parser.o commons/epoll.o hashtable/bst.o hashtable/hash.o
+memcached: memcached.o commons/sock.o commons/common.o commons/log.o commons/parser.o commons/epoll.o hashtable/bst.o hashtable/hash.o commons/stats.o
 
 clean:
 	rm -f memcached *.o commons/*.o hashtable/*.o

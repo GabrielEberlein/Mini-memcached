@@ -23,6 +23,7 @@ struct _HashTable {
   DestructorFunction destr;
   HashFunction hash;
 };
+
 typedef struct _HashTable *HashTable;
 
 void insert_hashtable(HashTable table, String key, String val);

@@ -79,6 +79,10 @@ void text_handle(int fd, char *args[3], int nargs){
 			sprintf(reply, "ENOTFOUND\n");
 		write(fd, reply, strlen(reply));
     } 
+
+	if(strcmp(cmd, "STATS") == 0) {
+
+	}
 }
 
 int bin_consume(int fd, int blen){
