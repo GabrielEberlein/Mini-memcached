@@ -2,23 +2,23 @@
 #include <stdlib.h>
 #include "queue.h"
 
-Queue* createQueue() {
+Queue* create_queue() {
     Queue* queue = (Queue*)malloc(sizeof(Queue));
     queue->first = NULL;
     queue->last = NULL;
     return queue;
 }
 
-Node* createNode(int data) {
-    Node* newNode = (Node*)malloc(sizeof(Node));
+Node create_node(int data) {
+    Node newNode = (Node)malloc(sizeof(Node));
     newNode->next = NULL;
     newNode->prev = NULL;
     newNode->data = data;
     return newNode;
 }
 
-void pushQueue(Queue* queue, int data) {
-    Node* newNode = createNode(data);
+void push_queue(Queue* queue, int data) {
+    Node newNode = create_node(data);
     if (queue->first == NULL) {
         queue->first = newNode;
         queue->last = newNode;
@@ -29,9 +29,9 @@ void pushQueue(Queue* queue, int data) {
     }
 }
 
-int popQueue(Queue* queue) {
-    if (queue->first == NULL) return -1;
-    Node* lastNode = queue->last;
+int pop_queue(Queue* queue) {
+    if (queue->first == NULL)  return -1;
+    Node lastNode = queue->last;
     int lastData = lastNode->data;
     if(lastNode->prev == NULL) {
         queue->first = NULL;
@@ -44,7 +44,7 @@ int popQueue(Queue* queue) {
     return lastData;
 }
 
-int relocateQueue(Queue* queue, Node* node) {
+int relocate_queue(Queue* queue, Node node) {
     if (node->prev != NULL) {
         if(node->next != NULL) {
             node->next->prev = node->prev;
@@ -58,17 +58,17 @@ int relocateQueue(Queue* queue, Node* node) {
     return node->data;
 }
 
-void destroyList(Node *firstNode) {
-    Node* currentNode = firstNode;
+void destroy_list(Node firstNode) {
+    Node currentNode = firstNode;
     while (currentNode != NULL) {
-        Node* nextNode = currentNode->next;
+        Node nextNode = currentNode->next;
         free(currentNode);
         currentNode = nextNode;
     }
 }
 
-void destroyQueue(Queue* queue) {
-    Node* firstNode = queue->first;
+void destroy_queue(Queue* queue) {
+    Node firstNode = queue->first;
     destroyList(firstNode);
     free(queue);
 }

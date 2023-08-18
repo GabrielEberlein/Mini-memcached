@@ -7,37 +7,43 @@
 #include <stdlib.h>
 #include <string.h>
 
-struct _Node{
-  char *key;
-  int value;
-  int size;
-  struct _Node *left;
-  struct _Node *right;
+struct _String{
+  char *data;
+  int len;
 };
 
-typedef struct _Node* Node;
+typedef struct _String* String;
 
-Node new_pair(char *word, int value);
+struct _BST{
+  String key;
+  String val;
+  struct _BST *left;
+  struct _BST *right;
+};
+
+typedef struct _BST* BST;
+
+String build_string(char* data, int len);
+
+BST new_pair(String key, String val);
 
 /**
  * Retorna 0 si los contactos tienen el mismo nombre.
  */
-int compare_keys(char *w1, char *w2);
+int compare_keys(String k1, String k2);
 
 /**
  * Función destructora de un contacto.
  */
 
-int size(Node node);
+BST free_bst(BST node);
 
-Node free_bst(Node node);
+BST delete_node(BST node);
 
-Node delete_node(Node node);
+BST insert_bst(BST node, String key, String val);
 
-Node insert_bst(Node node, char* key, int value);
+int delete_bst(BST* node, String key);
 
-Node delete_bst(Node node, char *key);
-
-int search_bst(Node node, char* key);
+String search_bst(BST node, String key);
 
 #endif /* __CONTACTO_H__ */

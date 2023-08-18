@@ -18,9 +18,7 @@
 		return -1;						\
 	rc; })
 
-
-
-int text_parser(const char *buf, char *toks[3], int lens[3])
+int text_parser(char *buf, char *toks[3], int lens[3])
 {
 //	char *toks[10];
 //	int lens[10];
@@ -43,7 +41,7 @@ int text_parser(const char *buf, char *toks[3], int lens[3])
 		lens[ntok-1] = p - toks[ntok-1];
 	}
 
-	log(3, "checking '%s', ntok = %i", toks[0], ntok);
+	log(1, "checking '%s', ntok = %i", toks[0], ntok);
 	return ntok;
 
 }

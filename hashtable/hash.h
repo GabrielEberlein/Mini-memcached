@@ -2,6 +2,8 @@
 #define __HASH_H_
 
 #include "bst.h"
+#define SEED 0
+#define NUM_REGIONS 1000
 
 /** Retorna una copia fisica del dato */
 typedef int (*CompareFunction)(void *data1, void *data2);
@@ -13,29 +15,28 @@ typedef unsigned (*HashFunction)(void *data);
 /** Retorna un entero sin signo para el dato */
 
 struct _HashTable {
-  Node *elems;
-  unsigned numElems;
-  unsigned collisions;
+  BST *elems;
+  pthread_mutex_t locks[NUM_REGIONS];
   unsigned capacity;
+  unsigned range;
   CompareFunction comp;
   DestructorFunction destr;
   HashFunction hash;
 };
+
 typedef struct _HashTable *HashTable;
 
-void insert_hashtable(HashTable table, char *key, int value);
+void insert_hashtable(HashTable table, String key, String val);
 
-void delete_hashtable(HashTable table, char *key);
+int delete_hashtable(HashTable table, String key);
 
-int search_hashtable(HashTable table, char *key);
+String search_hashtable(HashTable table, String key);
 
 HashTable hashtable_create(unsigned capacity);
-
-HashTable rehash_table(HashTable table);
 
 HashTable hashtable_destroy(HashTable tabla);
 
 HashTable hash_dictionary(char **dictionary, unsigned wordAmount, unsigned scalar);
 
-unsigned hash_word(char *word);
+unsigned hash_word(String word);
 #endif

@@ -8,5 +8,6 @@
 //! @param[in] port - puerto de la conexión.
 //! @param[out] socket - file descriptor del socket creado.
 int mk_tcp_sock(in_port_t port);
+int new_client(int sock);
 
 #endif
