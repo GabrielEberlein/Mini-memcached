@@ -16,6 +16,8 @@ void epoll_add(int efd, int sock, enum modes mode, int events){
 	Data* data = malloc(sizeof(Data));
     data->fd = sock;
     data->mode = mode;
+	data->buf = NULL;
+	data->blen = 0;
 	ev.data.ptr = data;
 	if (epoll_ctl (efd, EPOLL_CTL_ADD, sock, &ev) == -1) {
 		perror("epoll_ctl: add");

@@ -266,9 +266,9 @@ void put(const char *k)
 		int comm = PUT;
 		int lenData;
 		int lenKey = strlen(k);
-		char *buf = input(&lenData);
 		writen(fd, &comm, 1);
 		send_var(fd, lenKey, k);
+		char *buf = input(&lenData);
 		send_var(fd, lenData, buf);
 		free(buf);
 	}

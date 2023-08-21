@@ -7,6 +7,8 @@ enum modes {TEXT, BIN};
 typedef struct Data {
     int fd;
     enum modes mode;
+    char* buf;
+    int blen;
 } Data;
 
 int epoll_init();
