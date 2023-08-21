@@ -13,18 +13,18 @@
 -define(EINVAL, <<111>>).
 -define(ENOTFOUND, <<112>>).
 -define(EBINARY, <<113>>).
--define(EBIG,<<114>>).
--define(EUNK,<<115>>).
+-define(EBIG, <<114>>).
+-define(EUNK, <<115>>).
 
 % Conecta con el servidor especificado, devuelve el identificador
 % de Socket abierto para tal conección.
-start(ServerPort) -> gen_tcp:connect("localhost", ServerPort, [{active, true}]).
+start(ServerPort) -> gen_tcp:connect("localhost", ServerPort, [{active, false}, {mode, binary}]).
 
 % Parsea el argumento a la especificación en binario dada por el enunciado
 parse_to_binary(X) ->
-    Bin = term_to_binary(X),
-    BinLength = byte_size(Bin),
-    <<BinLength:32, Bin/binary>>.   
+    Binary = term_to_binary(X),
+    BinLength = byte_size(Binary),
+    <<BinLength:32, Binary/binary>>.
 
 % Parsea los argumentos de la respuesta segun la especificación en binario dada por el enunciado
 % Comprueba si ocurre un error de conección al intentar recibir los mismos
@@ -37,12 +37,12 @@ parse_response(Socket, Task) ->
                 {ok, Data} -> 
                     <<Length:32/integer-big>> = Data,
                     case gen_tcp:recv(Socket, Length) of
-                        {ok, Data} -> 
+                        {ok, Data2} -> 
                             case Task of
-                                get -> {ok, binary_to_term(Data)};
-                                stats -> {ok, binary_to_list(Data)}
+                                get -> {ok, binary_to_term(Data2)};
+                                stats -> {ok, binary_to_list(Data2)}
                             end;
-                        {error, Type} -> Type
+                        {error, Type2} -> Type2
                     end;
                 {error, Type} -> Type
             end
@@ -54,7 +54,7 @@ parse_response(Socket, Task) ->
 % Comprueba si ocurre un error de conección al intentar recibir los mismos
 handle_receive(Socket, Task) ->
     case gen_tcp:recv(Socket, 1) of
-        {ok, Data} -> 
+        {ok, Data} ->
             case Data of
                 ?OK -> parse_response(Socket, Task);
                 ?EINVAL -> einval;

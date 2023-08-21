@@ -7,10 +7,12 @@
 #include <stdlib.h>
 #include <pthread.h>
 
+enum stat_enum {PUT_STAT, GET_STAT, DEL_STAT, KEYS_STAT};
+
 // Estructura Stats
 /*
     Guarda el estado del servidor
-    - amounts : int[] / Lista de contadores
+    - amounts : u_int64_t[] / Lista de contadores
         [0] = Cantidad de las operaciones PUT 
         [0] = Cantidad de las operaciones GET 
         [0] = Cantidad de las operaciones DEL  
@@ -22,7 +24,7 @@
         [0] = Lock de los pares (Key, Value)
 */ 
 struct _Stats{
-    int amounts[NUM_STATS];
+    u_int64_t amounts[NUM_STATS];
     pthread_mutex_t locks[NUM_STATS];
 };
 typedef struct _Stats *Stats;
@@ -37,19 +39,13 @@ Stats stats_init();
 /*
     Incrementa el contador especificado
 */
-void stats_inc(Stats stats, int stat);
+void stats_inc(Stats stats, enum stat_enum stat);
 
 // stats_dec : Stats, int -> NULL
 /*
     Decrementa el contador especificado
 */
-void stats_dec(Stats stats, int stat);
-
-// stats_ret : Stats, int* -> NULL
-/*
-    Guarda en un array de enteros todos los contadores
-*/
-void stats_ret(Stats stats, int *rets);
+void stats_dec(Stats stats, enum stat_enum stat);
 
 // stats_destroy : Stats, int -> NULL
 /*

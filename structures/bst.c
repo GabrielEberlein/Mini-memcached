@@ -3,10 +3,11 @@
 
 #define SEED 0
 
-Node bst_insert(Queue queue, Node node, String key, String val) {
+Node bst_insert(Queue queue, Node node, Stats stats, String key, String val) {
   if (node == NULL){
     Node res = node_create(key, val);
     queue_push(queue, res);
+    stats_inc(stats, KEYS_STAT);
     return res;
   }
 
@@ -16,8 +17,8 @@ Node bst_insert(Queue queue, Node node, String key, String val) {
     node->val->len = val->len;
     queue_relocate(queue, node);
   }
-  if (cmp > 0 ) node->left  = bst_insert(queue, node->left, key, val);
-  if (cmp < 0 ) node->right = bst_insert(queue, node->right, key, val);
+  if (cmp > 0 ) node->left  = bst_insert(queue, node->left, stats, key, val);
+  if (cmp < 0 ) node->right = bst_insert(queue, node->right, stats, key, val);
 
   return node;
 }
@@ -52,7 +53,7 @@ Node bst_replace(Node node) {
   return replacement;
 }
 
-int bst_delete(Queue queue, Node* node, String key){
+int bst_delete(Queue queue, Node* node, Stats stats, String key){
   if((*node)==NULL) return -1;
   int cmp = string_compare((*node)->key, key);
 
@@ -60,9 +61,10 @@ int bst_delete(Queue queue, Node* node, String key){
     Node replacement = bst_replace((*node));
     queue_delete(queue, (*node));
     (*node) = replacement;
+    stats_dec(stats, KEYS_STAT);
   }
-  if (cmp > 0 ) return bst_delete(queue, &((*node)->left), key);
-  if (cmp < 0 ) return bst_delete(queue, &((*node)->right), key);
+  if (cmp > 0 ) return bst_delete(queue, &((*node)->left), stats, key);
+  if (cmp < 0 ) return bst_delete(queue, &((*node)->right), stats, key);
 
   return 0;
 }

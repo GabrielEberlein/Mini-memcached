@@ -9,12 +9,6 @@
 */
 int mk_tcp_sock(in_port_t port);
 
-// isnonblocking : int -> sfd
-/*
-    Configura a un Socket como no bloqueante
-*/
-static int isnonblocking(int sfd);
-
 // new_client : int -> int
 /*
     Acepta una nueva conección al socket especificado y devuelve su File Descriptor

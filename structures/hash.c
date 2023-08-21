@@ -73,7 +73,7 @@ void hashtable_insert(Queue queue, HashTable table, String key, String val) {
   log(1,"Hash: %d",idx);
   int region = idx / table->range;
   pthread_mutex_lock(table->locks+region);
-  table->elems[idx] = bst_insert(queue, table->elems[idx], key, val);
+  table->elems[idx] = bst_insert(queue, table->elems[idx], table->stats, key, val);
   pthread_mutex_unlock(table->locks+region);
 }
 
@@ -91,7 +91,7 @@ int hashtable_delete(Queue queue, HashTable table, String key) {
   unsigned idx = table->hash(key) % table->capacity;
   int region = idx / table->range;
   pthread_mutex_lock(table->locks+region);
-  int res = bst_delete(queue, &(table->elems[idx]), key);
+  int res = bst_delete(queue, &(table->elems[idx]), table->stats, key);
   pthread_mutex_unlock(table->locks+region);
   return res;
 }

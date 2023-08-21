@@ -33,6 +33,10 @@ int mk_tcp_sock(in_port_t port)
 	return s;
 }
 
+// isnonblocking : int -> sfd
+/*
+    Configura a un Socket como no bloqueante
+*/
 static int isnonblocking(int sfd)
 {
 	int flags, s;
