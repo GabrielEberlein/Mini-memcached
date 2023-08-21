@@ -33,13 +33,15 @@ struct ThreadArgs{
 };
 
 /* Macro interna */
-#define READ(fd, buf, n) ({						\
-	int rc = read(fd, buf, n);					\
-	if (rc < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))	\
-		return 0;						\
-	if (rc <= 0){							\
-		close(fd);						\
-		return -1;}						\
+#define READ(fd, buf, blen, n) ({							\
+	int rc = read(fd, *buf + *blen, n);						\
+	if (rc < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))\
+		return 0;											\
+	if (rc <= 0){											\
+		free(*buf);											\
+		*blen = 0;											\
+		close(fd);											\
+		return -1;}											\
 	rc; })
 
 void text_handle(int fd, char *args[3], int nargs){
@@ -92,6 +94,7 @@ void text_handle(int fd, char *args[3], int nargs){
 		write(fd, reply, len);
     } 
 
+	//Para printear la cola, sacarlo a la chucha cuando terminemos
 	if(priorityqueue->first && priorityqueue->last){
 		char* buf=malloc(2024);
 		char* buf2=malloc(2024);
@@ -105,86 +108,50 @@ void text_handle(int fd, char *args[3], int nargs){
 	}
 }
 
-int bin_consume(int fd, int blen){
-	char cmd;
-	int nread = READ(fd, &cmd, 1);
-	switch (cmd) {
-	case PUT: {
-		stats_inc(table->stats, 0);
-		int len_net;
-		nread = READ(fd, &len_net, 4);
-		int keyLen = ntohl(len_net);
-		char* keyData = malloc(keyLen);
-		nread = READ(fd, keyData, keyLen);
-		String key = string_create(keyData, nread);
-		log(1, "Data: %s, Key: %d\n", keyData, keyLen);
-		free(keyData);
-
-		nread = READ(fd, &len_net, 4);
-		int valLen = ntohl(len_net);
-		char* valData = malloc(valLen);
-		nread = READ(fd, valData, valLen);
-		String val = string_create(valData, nread);
-		free(valData);
-
-		hashtable_insert(priorityqueue, table, key, val);
-		stats_inc(table->stats, 3);
-
+void bin_handle(int fd, char* args[3], int lens[3]){
+	char cmd = args[0][0];
+	switch (cmd)
+	{
+	case PUT:{
+		String key = build_string(args[1], lens[1]);
+		log(1, "Data: %s, Len: %d\n", key->data, key->len);
+		String val = build_string(args[2], lens[2]);
+		log(1, "Data: %s, Len: %d\n", val->data, val->len);
+        insert_hashtable(priorityqueue, table, key, val);
 		char k = OK;
 		write(fd, &k, 1);
+		log(1,"Me mueroo\n");
 		break;
 	}
-	case GET: {
-		log(1, "GETTEANDO\n");
-		stats_inc(table->stats, 1);
-		int len_net;
-		nread = READ(fd, &len_net, 4);
-		int keyLen = ntohl(len_net);
-		char* keyData = malloc(keyLen);
-		nread = READ(fd, keyData, keyLen);
-		String key = string_create(keyData, keyLen);
-		free(keyData);
-		log(1,"Key: %s, len: %d",key->data, key->len);
-
-		String value = hashtable_search(priorityqueue, table, key);
-
-		if(value != NULL) {
+	case GET:{
+		String key = build_string(args[1], lens[1]);
+        String val = search_hashtable(priorityqueue, table, key);
+		if(val != NULL){
 			char k = OK;
-			len_net = htonl(value->len);
-			write(fd, &k, 1);
+        	write(fd, &k, 1);
+			int len_net = htonl(val->len);
 			write(fd, &len_net, 4);
-			write(fd, value->data, value->len);
-		} else {
-			char enotfound = ENOTFOUND;
-			write(fd, &enotfound, 1);
+			write(fd, val->data, val->len);
 		}
-
+		else{
+			char enf = ENOTFOUND;
+			write(fd, &enf, 1);
+		}
 		break;
 	}
-	case DEL: {
-		stats_inc(table->stats, 2);
-		char lbuf[4];
-		nread = READ(fd, lbuf, 4);
-		int len_net = *(int*)lbuf;
-		int keyLen = ntohl(len_net);
-		char* keyData = malloc(keyLen);
-		nread = READ(fd, keyData, keyLen);
-		String key = string_create(keyData, keyLen);
-		free(keyData);
-
-		int res = hashtable_delete(priorityqueue, table, key);
-
-		char reply;
-		if (res != -1) {
-			reply = OK;
-			stats_dec(table->stats, 2);
-		} else reply = ENOTFOUND;
-
-		write(fd, &reply, 1);
-
+	case DEL:{
+        String key = build_string(args[1], lens[1]);
+        int res = delete_hashtable(priorityqueue, table, key);
+        if(res != -1){
+			char k = OK;
+        	write(fd, &k, 1);
+		}
+		else{
+			char enf = ENOTFOUND;
+			write(fd, &enf, 1);
+		}
 		break;
 	}
-
 	case STATS:	{
 		char reply = OK, buffer[2024];
 		write(fd, &reply, 1);
@@ -193,28 +160,94 @@ int bin_consume(int fd, int blen){
 		write(fd, &len_net, 4);
 		write(fd, buffer, len);
 	}
+	default:
+		break;
+	}
+}
+
+int bin_consume(char** buf, int fd, int* blen){
+	log(1, "Entre, blen:%d", *blen);
+	if(*buf==NULL) *buf = malloc(5);
+	int nread;
+	char *args[3]= {NULL};
+	int lens[3] = {0};
+	if ((*blen) == 0) (*blen) += READ(fd, buf, blen, 1);
+	args[0] = (*buf);
+
+	switch (buf[0][0]) {
+	case PUT: {
+		if ((*blen) < 1 + 4) (*blen) += READ(fd, buf, blen, 1 + 4 - (*blen));
+		int len_net;
+		memcpy(&len_net, (*buf) + 1, 4);
+		lens[1] = ntohl(len_net);
+		if((*blen)==5) (*buf) = realloc(*buf, 1+4+lens[1]+4);
+
+		if ((*blen) < 1 + 4 + lens[1]) (*blen) += READ(fd, buf, blen, 1 + 4 + lens[1] - (*blen));
+		args[1] = ((*buf) + 1 + 4);
+		
+		if ((*blen) < 1 + 4 + lens[1] + 4) (*blen) += READ(fd, buf, blen, 1 + 4 + lens[1] + 4 - (*blen));
+		memcpy(&len_net, (*buf) + 1 + 4 + lens[1], 4);
+		lens[2] = ntohl(len_net);
+		if((*blen)==5 + lens[1] + 4) (*buf) = realloc(*buf, 1+4+lens[1]+4+lens[2]);
+		(*blen) += READ(fd, buf, blen, 1 + 4 + lens[1] + 4 + lens[2] - (*blen));
+		args[2] = ((*buf) + 1 + 4 + lens[1] + 4);
+
+		bin_handle(fd,args,lens);
+		break;
+	}
+	case GET: {
+		if ((*blen) < 1 + 4) (*blen) += READ(fd, buf, blen, 1 + 4 - (*blen));
+		int len_net;
+		memcpy(&len_net, (*buf) + 1, 4);
+		lens[1] = ntohl(len_net);
+		if((*blen)==5) (*buf) = realloc(*buf, 1+4+lens[1]);
+
+		(*blen) += READ(fd, buf, blen, 1 + 4 + lens[1] - (*blen));
+		args[1] = ((*buf) + 1 + 4);
+
+		bin_handle(fd,args,lens);
+		break;
+	}
+	case DEL: {
+		if ((*blen) < 1 + 4) (*blen) += READ(fd, buf, blen, 1 + 4 - (*blen));
+		int len_net;
+		memcpy(&len_net, (*buf) + 1, 4);
+		lens[1] = ntohl(len_net);
+		if((*blen)==5) (*buf) = realloc(*buf, 1+4+lens[1]);
+
+		(*blen) += READ(fd, buf, blen, 1 + 4 + lens[1] - (*blen));
+		args[1] = ((*buf) + 1 + 4);
+
+		bin_handle(fd,args,lens);
+		break;
+	}
+
+	case STATS:
+		bin_handle(fd,args,lens);
+		break;
 
 	default:
 		break;
 	}
-	return 1;
+	return 0;
 }
 
 /* 0: todo ok, continua. -1 errores */
-int text_consume(char buf[2024], int fd, int blen)
+int text_consume(char** buf, int fd, int* blen)
 {
+	if((*buf)==NULL) (*buf) = malloc(2048);
 	while (1) {
 		//int rem = sizeof *buf - blen;
-		int rem = 2024 - blen;
+		int rem = 2048 - (*blen);
 		assert (rem >= 0);
 		/* Buffer lleno, no hay comandos, matar */
 		if (rem == 0)
 			return -1;
-		int nread = READ(fd, buf + blen, rem);	
+		int nread = READ(fd, buf, blen, rem);	
 		log(1, "Read %i bytes from fd %i", nread, fd);
-		blen += nread;
-		char *p, *p0 = buf;
-		int nlen = blen;
+		(*blen) += nread;
+		char *p, *p0 = (*buf);
+		int nlen = (*blen);
 
 		/* Para cada \n, procesar, y avanzar punteros */
 		while ((p = memchr(p0, '\n', nlen)) != NULL) {
@@ -237,9 +270,9 @@ int text_consume(char buf[2024], int fd, int blen)
 		}
 
 		/* Si consumimos algo, mover */
-		if (p0 != buf) {
-			memmove(buf, p0, nlen);
-			blen = nlen;
+		if (p0 != (*buf)) {
+			memmove((*buf), p0, nlen);
+			(*blen) = nlen;
 		}
 	}
 	return 0;
@@ -294,10 +327,10 @@ void *thread(void *args) {
 				epoll_add(efd, csock, data->mode, EPOLLIN | EPOLLET | EPOLLONESHOT);
 				epoll_mod(efd, data->fd, data->mode, data, EPOLLIN | EPOLLONESHOT);
 			} else {
-				char buffer[2024];
 				int r;
-				if(data->mode == TEXT) r = text_consume(buffer, data->fd, 0);
-				if(data->mode == BIN) r = bin_consume(data->fd, 0);
+				if(data->mode == TEXT) r = text_consume(&(data->buf), data->fd, &(data->blen));
+				if(data->mode == BIN) r = bin_consume(&(data->buf), data->fd, &(data->blen));
+				log(1, "Return: %d", r);
 				if(r != -1) epoll_mod(efd, data->fd, data->mode, data, EPOLLIN | EPOLLET | EPOLLONESHOT);
 			}
 		}
