@@ -50,7 +50,6 @@ unsigned hash_word(String word) {
 }
 
 HashTable hashtable_create(unsigned capacity) {
-  // Pedimos memoria para la estructura principal y las casillas.
   HashTable table = malloc(sizeof(struct _HashTable));
   assert(table != NULL);
   table->elems = calloc(capacity, sizeof(struct _Node));
@@ -58,11 +57,10 @@ HashTable hashtable_create(unsigned capacity) {
   table->capacity = capacity;
   table->stats = stats_init();
   table->range = capacity / NUM_REGIONS;
-  table->comp = (CompareFunction)compare_keys;
-  table->destr = (DestructorFunction)free_bst;
+  table->comp = (CompareFunction)string_compare;
+  table->destr = (DestructorFunction)bst_destroy;
   table->hash = (HashFunction)hash_word;
 
-  // Inicializamos los locks.
   for (unsigned idx = 0; idx < NUM_REGIONS; ++idx) {
     pthread_mutex_init(table->locks+idx, NULL);
   }
@@ -70,8 +68,35 @@ HashTable hashtable_create(unsigned capacity) {
   return table;
 }
 
-HashTable hashtable_destroy(HashTable table) {
-  if(table == NULL) return NULL;
+void hashtable_insert(Queue queue, HashTable table, String key, String val) {
+  unsigned idx = table->hash(key) % table->capacity;
+  log(1,"Hash: %d",idx);
+  int region = idx / table->range;
+  pthread_mutex_lock(table->locks+region);
+  table->elems[idx] = bst_insert(queue, table->elems[idx], key, val);
+  pthread_mutex_unlock(table->locks+region);
+}
+
+String hashtable_search(Queue queue, HashTable table, String key) {
+  unsigned idx = table->hash(key) % table->capacity;
+  log(1,"Hash: %d",idx);
+  int region = idx / table->range;
+  pthread_mutex_lock(table->locks+region);
+  String value = bst_search(queue, table->elems[idx], key);
+  pthread_mutex_unlock(table->locks+region);
+  return value;
+}
+
+int hashtable_delete(Queue queue, HashTable table, String key) {
+  unsigned idx = table->hash(key) % table->capacity;
+  int region = idx / table->range;
+  pthread_mutex_lock(table->locks+region);
+  int res = bst_delete(queue, &(table->elems[idx]), key);
+  pthread_mutex_unlock(table->locks+region);
+  return res;
+}
+
+void hashtable_destroy(HashTable table) {
   // Destruir cada uno de los datos.
   for (unsigned idx = 0; idx < table->capacity; ++idx)
       table->destr(table->elems[idx]);
@@ -81,37 +106,7 @@ HashTable hashtable_destroy(HashTable table) {
       pthread_mutex_destroy(table->locks+idx);
 
   stats_destroy(table->stats);
-  // Liberar el arreglo de casillas y la table.
+  // Liberar el arreglo de casillas y la Tabla.
   free(table->elems);
   free(table);
-  table = NULL;
-  return table;
-}
-
-void insert_hashtable(Queue* queue, HashTable table, String key, String val) {
-  unsigned idx = table->hash(key) % table->capacity;
-  log(1,"Hash: %d",idx);
-  int region = idx / table->range;
-  pthread_mutex_lock(table->locks+region);
-  table->elems[idx] = insert_bst(queue, table->elems[idx], key, val);
-  pthread_mutex_unlock(table->locks+region);
-}
-
-int delete_hashtable(Queue* queue, HashTable table, String key) {
-  unsigned idx = table->hash(key) % table->capacity;
-  int region = idx / table->range;
-  pthread_mutex_lock(table->locks+region);
-  int res = delete_bst(queue, &(table->elems[idx]), key);
-  pthread_mutex_unlock(table->locks+region);
-  return res;
-}
-
-String search_hashtable(Queue* queue, HashTable table, String key) {
-  unsigned idx = table->hash(key) % table->capacity;
-  log(1,"Hash: %d",idx);
-  int region = idx / table->range;
-  pthread_mutex_lock(table->locks+region);
-  String value = search_bst(queue, table->elems[idx], key);
-  pthread_mutex_unlock(table->locks+region);
-  return value;
 }

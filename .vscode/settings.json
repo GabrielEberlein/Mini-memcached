@@ -5,6 +5,10 @@
         "functional": "c",
         "tuple": "c",
         "type_traits": "c",
-        "utility": "c"
+        "utility": "c",
+        "stdint.h": "c",
+        "node.h": "c",
+        "string": "c",
+        "string_view": "c"
     }
 }

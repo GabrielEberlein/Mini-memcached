@@ -3,11 +3,22 @@
 
 #include <netinet/in.h>
 
-//! @brief Crea un socket, lo bindea al puerto port y se pone a escuchar .
-//!
-//! @param[in] port - puerto de la conexión.
-//! @param[out] socket - file descriptor del socket creado.
+// mk_tcp_sock : in_port_t -> int
+/*
+    Crea un nuevo Socket y restorna su File Descriptor
+*/
 int mk_tcp_sock(in_port_t port);
+
+// isnonblocking : int -> sfd
+/*
+    Configura a un Socket como no bloqueante
+*/
+static int isnonblocking(int sfd);
+
+// new_client : int -> int
+/*
+    Acepta una nueva conección al socket especificado y devuelve su File Descriptor
+*/
 int new_client(int sock);
 
 #endif

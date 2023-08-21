@@ -15,6 +15,8 @@
 #include "commons/parser.h"
 #include "structures/hash.h"
 #include "structures/queue.h"
+#include "structures/stats.h"
+#include "structures/node.h"
 #include "commons/epoll.h"
 
 #define MAX_EVENTS 10
@@ -22,7 +24,7 @@
 
 struct epoll_event events[MAX_EVENTS];
 HashTable table;
-Queue* priorityqueue;
+Queue priorityqueue;
 
 struct ThreadArgs{
 	int text_sock;
@@ -46,10 +48,10 @@ void text_handle(int fd, char *args[3], int nargs){
     if(strcmp(cmd,"PUT") == 0) {
 		stats_inc(table->stats, 0);
 		assert(nargs == 3);
-		String key = build_string(args[1], strlen(args[1]));
+		String key = string_create(args[1], strlen(args[1]));
 		log(1, "Data: %s, Key: %d\n", key->data, key->len);
-		String val = build_string(args[2], strlen(args[2]));
-        insert_hashtable(priorityqueue, table, key, val);
+		String val = string_create(args[2], strlen(args[2]));
+        hashtable_insert(priorityqueue, table, key, val);
 		char reply[2024];
         sprintf(reply, "OK\n");
 		write(fd, reply, strlen(reply));
@@ -58,9 +60,8 @@ void text_handle(int fd, char *args[3], int nargs){
     if(strcmp(cmd,"GET") == 0) {
 		stats_inc(table->stats, 1);
 		assert(nargs == 2);
-		String key = build_string(args[1], strlen(args[1]));
-        String val = search_hashtable(priorityqueue, table, key);
-		char reply[2024];
+		String key = string_create(args[1], strlen(args[1]));
+        String val = hashtable_search(priorityqueue, table, key);
 		if(val != NULL){
         	write(fd, "OK ", 3);
 			write(fd, val->data, val->len);
@@ -73,13 +74,13 @@ void text_handle(int fd, char *args[3], int nargs){
     if(strcmp(cmd,"DEL") == 0) {
 		stats_inc(table->stats, 2);
 		assert(nargs == 2);
-        String key = build_string(args[1], strlen(args[1]));
-        int res = delete_hashtable(priorityqueue, table, key);
+        String key = string_create(args[1], strlen(args[1]));
+        int res = hashtable_delete(priorityqueue, table, key);
 		char reply[2024];
-        if(res != -1)
-        	sprintf(reply, "OK\n");
+        if(res != -1) {
+			sprintf(reply, "OK\n");
 			stats_dec(table->stats, 2);
-		else
+		} else
 			sprintf(reply, "ENOTFOUND\n");
 		write(fd, reply, strlen(reply));
     } 
@@ -115,7 +116,7 @@ int bin_consume(int fd, int blen){
 		int keyLen = ntohl(len_net);
 		char* keyData = malloc(keyLen);
 		nread = READ(fd, keyData, keyLen);
-		String key = build_string(keyData, nread);
+		String key = string_create(keyData, nread);
 		log(1, "Data: %s, Key: %d\n", keyData, keyLen);
 		free(keyData);
 
@@ -123,10 +124,10 @@ int bin_consume(int fd, int blen){
 		int valLen = ntohl(len_net);
 		char* valData = malloc(valLen);
 		nread = READ(fd, valData, valLen);
-		String val = build_string(valData, nread);
+		String val = string_create(valData, nread);
 		free(valData);
 
-		insert_hashtable(priorityqueue, table, key, val);
+		hashtable_insert(priorityqueue, table, key, val);
 		stats_inc(table->stats, 3);
 
 		char k = OK;
@@ -141,11 +142,11 @@ int bin_consume(int fd, int blen){
 		int keyLen = ntohl(len_net);
 		char* keyData = malloc(keyLen);
 		nread = READ(fd, keyData, keyLen);
-		String key = build_string(keyData, keyLen);
+		String key = string_create(keyData, keyLen);
 		free(keyData);
 		log(1,"Key: %s, len: %d",key->data, key->len);
 
-		String value = search_hashtable(priorityqueue, table, key);
+		String value = hashtable_search(priorityqueue, table, key);
 
 		if(value != NULL) {
 			char k = OK;
@@ -168,15 +169,15 @@ int bin_consume(int fd, int blen){
 		int keyLen = ntohl(len_net);
 		char* keyData = malloc(keyLen);
 		nread = READ(fd, keyData, keyLen);
-		String key = build_string(keyData, keyLen);
+		String key = string_create(keyData, keyLen);
 		free(keyData);
 
-		int res = delete_hashtable(priorityqueue, table, key);
+		int res = hashtable_delete(priorityqueue, table, key);
 
 		char reply;
 		if (res != -1) {
 			reply = OK;
-			void stats_dec(table->stats, 2);
+			stats_dec(table->stats, 2);
 		} else reply = ENOTFOUND;
 
 		write(fd, &reply, 1);
@@ -184,14 +185,14 @@ int bin_consume(int fd, int blen){
 		break;
 	}
 
-	case STATS:	
-		int[NUM_STATS] = stats_ret(table->stats);
+	case STATS:	{
 		char reply = OK, buffer[2024];
 		write(fd, &reply, 1);
 		int len = snprintf(buffer, 0, "PUTS=%d GETS=%d DELS=%d KEYS=%d", table->stats[0], table->stats[1], table->stats[2], table->stats[3]);
 		int len_net = htonl(len);
 		write(fd, &len_net, 4);
 		write(fd, buffer, len);
+	}
 
 	default:
 		break;
@@ -339,10 +340,7 @@ int main(int argc, char **argv)
 
 	handle_signals();
 	table = hashtable_create(1<<20);
-	priorityqueue = create_queue();
-
-	/*Función que limita la memoria*/
-	//limit_mem(0);
+	priorityqueue = queue_create();
 
 	text_sock = mk_tcp_sock(mc_lport_text);
 	if (text_sock < 0)
