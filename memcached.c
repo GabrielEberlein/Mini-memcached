@@ -18,6 +18,7 @@
 #include "structures/stats.h"
 #include "structures/node.h"
 #include "commons/epoll.h"
+#include "commons/stats.h"
 
 #define MAX_EVENTS 10
 #define MAX_THREADS 5
@@ -45,7 +46,7 @@ struct ThreadArgs{
 		close(fd); 											\
 		log(1, "Hola");										\
 		return -1;}											\
-	rc; })
+	rc; }) 													\
 
 void text_handle(int fd, char *args[3], int nargs){
 	char *cmd = args[0];
@@ -59,7 +60,7 @@ void text_handle(int fd, char *args[3], int nargs){
         hashtable_insert(priorityqueue, table, key, val);
 		char reply[2024];
         sprintf(reply, "OK\n");
-		write(fd, reply, strlen(reply));
+		write(fd, reply, 3);
     }
 
     if(strcmp(cmd,"GET") == 0) {
@@ -171,7 +172,7 @@ void bin_handle(int fd, char* args[3], int lens[3]){
 	}
 }
 
-int bin_consume(char** buf, int fd, int* blen){
+int bin_consume(char** buf, int fd, int* blen) {
 	log(1, "Entre, blen: %d", *blen);
 	if(*buf==NULL) *buf = malloc(5);
 	char *args[3]= {NULL};
@@ -180,60 +181,61 @@ int bin_consume(char** buf, int fd, int* blen){
 	args[0] = (*buf);
 
 	switch (buf[0][0]) {
-	case PUT: {
-		if ((*blen) < 1 + 4) (*blen) += READ(fd, buf, blen, 1 + 4 - (*blen));
-		int len_net;
-		memcpy(&len_net, (*buf) + 1, 4);
-		log(1, "Network: %d", len_net);
-		lens[1] = ntohl(len_net);
-		log(1, "Host: %d", lens[1]);
-		if((*blen)==5) (*buf) = realloc(*buf, 1+4+lens[1]+4);
+		case PUT: {
+			if ((*blen) < 1 + 4) (*blen) += READ(fd, buf, blen, 1 + 4 - (*blen));
+			int len_net;
+			memcpy(&len_net, (*buf) + 1, 4);
+			log(1, "Network: %d", len_net);
+			lens[1] = ntohl(len_net);
+			log(1, "Host: %d", lens[1]);
+			if((*blen)==5) (*buf) = realloc(*buf, 1+4+lens[1]+4);
 
-		if ((*blen) < 1 + 4 + lens[1]) (*blen) += READ(fd, buf, blen, 1 + 4 + lens[1] - (*blen));
-		args[1] = ((*buf) + 1 + 4);
-		
-		if ((*blen) < 1 + 4 + lens[1] + 4) (*blen) += READ(fd, buf, blen, 1 + 4 + lens[1] + 4 - (*blen));
-		memcpy(&len_net, (*buf) + 1 + 4 + lens[1], 4);
-		lens[2] = ntohl(len_net);
-		if((*blen)==5 + lens[1] + 4) (*buf) = realloc(*buf, 1+4+lens[1]+4+lens[2]);
-		(*blen) += READ(fd, buf, blen, 1 + 4 + lens[1] + 4 + lens[2] - (*blen));
-		args[2] = ((*buf) + 1 + 4 + lens[1] + 4);
+			if ((*blen) < 1 + 4 + lens[1]) (*blen) += READ(fd, buf, blen, 1 + 4 + lens[1] - (*blen));
+			args[1] = ((*buf) + 1 + 4);
+			
+			if ((*blen) < 1 + 4 + lens[1] + 4) (*blen) += READ(fd, buf, blen, 1 + 4 + lens[1] + 4 - (*blen));
+			memcpy(&len_net, (*buf) + 1 + 4 + lens[1], 4);
+			lens[2] = ntohl(len_net);
+			if((*blen)==5 + lens[1] + 4) (*buf) = realloc(*buf, 1+4+lens[1]+4+lens[2]);
+			(*blen) += READ(fd, buf, blen, 1 + 4 + lens[1] + 4 + lens[2] - (*blen));
+			args[2] = ((*buf) + 1 + 4 + lens[1] + 4);
 
-		bin_handle(fd,args,lens);
-		break;
-	}
-	case GET: {
-		if ((*blen) < 1 + 4) (*blen) += READ(fd, buf, blen, 1 + 4 - (*blen));
-		int len_net;
-		memcpy(&len_net, (*buf) + 1, 4);
-		lens[1] = ntohl(len_net);
-		if((*blen)==5) (*buf) = realloc(*buf, 1+4+lens[1]);
+			bin_handle(fd,args,lens);
+			break;
+		}
+		case GET: {
+			if ((*blen) < 1 + 4) (*blen) += READ(fd, buf, blen, 1 + 4 - (*blen));
+			int len_net;
+			memcpy(&len_net, (*buf) + 1, 4);
+			lens[1] = ntohl(len_net);
+			if((*blen)==5) (*buf) = realloc(*buf, 1+4+lens[1]);
 
-		(*blen) += READ(fd, buf, blen, 1 + 4 + lens[1] - (*blen));
-		args[1] = ((*buf) + 1 + 4);
+			(*blen) += READ(fd, buf, blen, 1 + 4 + lens[1] - (*blen));
+			args[1] = ((*buf) + 1 + 4);
 
-		bin_handle(fd,args,lens);
-		break;
-	}
-	case DEL: {
-		if ((*blen) < 1 + 4) (*blen) += READ(fd, buf, blen, 1 + 4 - (*blen));
-		int len_net;
-		memcpy(&len_net, (*buf) + 1, 4);
-		lens[1] = ntohl(len_net);
-		if((*blen)==5) (*buf) = realloc(*buf, 1+4+lens[1]);
+			bin_handle(fd,args,lens);
+			break;
+		}
+		case DEL: {
+			if ((*blen) < 1 + 4) (*blen) += READ(fd, buf, blen, 1 + 4 - (*blen));
+			int len_net;
+			memcpy(&len_net, (*buf) + 1, 4);
+			lens[1] = ntohl(len_net);
+			if((*blen)==5) (*buf) = realloc(*buf, 1+4+lens[1]);
 
-		(*blen) += READ(fd, buf, blen, 1 + 4 + lens[1] - (*blen));
-		args[1] = ((*buf) + 1 + 4);
+			(*blen) += READ(fd, buf, blen, 1 + 4 + lens[1] - (*blen));
+			args[1] = ((*buf) + 1 + 4);
 
-		bin_handle(fd,args,lens);
-		break;
-	}
-	case STATS:
-		bin_handle(fd,args,lens);
-		break;
-
-	default:
-		break;
+			bin_handle(fd,args,lens);
+			break;
+		}
+		case STATS: {
+			bin_handle(fd,args,lens);
+			break;
+		}
+		default: {
+			break;
+		}
 	}
 	if((*buf) != NULL) {
 		free(*buf);											
@@ -244,8 +246,7 @@ int bin_consume(char** buf, int fd, int* blen){
 }
 
 /* 0: todo ok, continua. -1 errores */
-int text_consume(char** buf, int fd, int* blen)
-{
+int text_consume(char** buf, int fd, int* blen) {
 	if((*buf)==NULL) (*buf) = malloc(2048);
 	while (1) {
 		//int rem = sizeof *buf - blen;
