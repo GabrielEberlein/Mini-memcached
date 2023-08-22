@@ -44,13 +44,13 @@ HashTable hashtable_create(unsigned capacity);
 /*
   Agrega el par (Key, Value) a la Tabla Hash
 */
-void hashtable_insert(Queue queue, HashTable table, String key, String val);
+void hashtable_insert(Queue queue, HashTable table, String key, String val, int bin);
 
 // hashtable_search : Queue*, HashTable, String -> String
 /*
   Busca un valor en la Tabla Hash por su Key, retorna el mismo
 */
-String hashtable_search(Queue queue, HashTable table, String key);
+String hashtable_search(Queue queue, HashTable table, String key, int* bin);
 
 // hashtable_delete : Queue*, HashTable, String -> int
 /*

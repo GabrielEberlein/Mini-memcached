@@ -68,21 +68,21 @@ HashTable hashtable_create(unsigned capacity) {
   return table;
 }
 
-void hashtable_insert(Queue queue, HashTable table, String key, String val) {
+void hashtable_insert(Queue queue, HashTable table, String key, String val, int bin) {
   unsigned idx = table->hash(key) % table->capacity;
   log(1,"Hash: %d",idx);
   int region = idx / table->range;
   pthread_mutex_lock(table->locks+region);
-  table->elems[idx] = bst_insert(queue, table->elems[idx], table->stats, key, val);
+  table->elems[idx] = bst_insert(queue, table->elems[idx], table->stats, key, val, bin);
   pthread_mutex_unlock(table->locks+region);
 }
 
-String hashtable_search(Queue queue, HashTable table, String key) {
+String hashtable_search(Queue queue, HashTable table, String key, int* bin) {
   unsigned idx = table->hash(key) % table->capacity;
   log(1,"Hash: %d",idx);
   int region = idx / table->range;
   pthread_mutex_lock(table->locks+region);
-  String value = bst_search(queue, table->elems[idx], key);
+  String value = bst_search(queue, table->elems[idx], key, bin);
   pthread_mutex_unlock(table->locks+region);
   return value;
 }

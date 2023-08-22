@@ -15,7 +15,7 @@
     Inserta un nuevo nodo en el BST o actualiza el valor si el mismo ya existe
     y reposicionandolo al frente de la cola
 */
-Node bst_insert(Queue queue, Node node, Stats stats, String key, String val);
+Node bst_insert(Queue queue, Node node, Stats stats, String key, String val, int bin);
 
 // search_bst : Queue, Node, String -> String
 /*
@@ -23,7 +23,7 @@ Node bst_insert(Queue queue, Node node, Stats stats, String key, String val);
     Si lo encuentra, devuelve el valor y reposiciona el nodo al frente de la cola
     Si no lo encuentra, devuelve NULL
 */
-String bst_search(Queue queue, Node node, String key);
+String bst_search(Queue queue, Node node, String key, int* bin);
 
 // delete_bst -> Queue, Node*, String -> int
 /*

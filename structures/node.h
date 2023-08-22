@@ -38,6 +38,7 @@ struct _Node{
   struct _Node *right;
   struct _Node* prev; //relaciones en la cola
   struct _Node* next;
+  int binary;
 };
 typedef struct _Node* Node;
 
@@ -66,7 +67,7 @@ void string_destroy(String string);
 /*
     Crea e inicializa un nuevo Nodo con los valores dados
 */
-Node node_create(String key, String val);
+Node node_create(String key, String val, int bin);
 
 // delete_node -> Queue*, Node -> Node
 /*

@@ -23,7 +23,7 @@ void string_destroy(String string) {
   free(string);
 }
 
-Node node_create(String key, String val) {
+Node node_create(String key, String val, int bin) {
   Node newNode = malloc(sizeof(struct _Node));
   assert(newNode != NULL);
 
@@ -33,6 +33,7 @@ Node node_create(String key, String val) {
   newNode->right = NULL;
   newNode->prev = NULL;
   newNode->next = NULL;
+  newNode->binary = bin;
 
   return newNode;
 }

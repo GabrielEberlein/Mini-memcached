@@ -3,9 +3,9 @@
 
 #define SEED 0
 
-Node bst_insert(Queue queue, Node node, Stats stats, String key, String val) {
+Node bst_insert(Queue queue, Node node, Stats stats, String key, String val, int bin) {
   if (node == NULL){
-    Node res = node_create(key, val);
+    Node res = node_create(key, val, bin);
     queue_push(queue, res);
     stats_inc(stats, KEYS_STAT);
     return res;
@@ -17,21 +17,22 @@ Node bst_insert(Queue queue, Node node, Stats stats, String key, String val) {
     node->val->len = val->len;
     queue_relocate(queue, node);
   }
-  if (cmp > 0 ) node->left  = bst_insert(queue, node->left, stats, key, val);
-  if (cmp < 0 ) node->right = bst_insert(queue, node->right, stats, key, val);
+  if (cmp > 0 ) node->left  = bst_insert(queue, node->left, stats, key, val, bin);
+  if (cmp < 0 ) node->right = bst_insert(queue, node->right, stats, key, val, bin);
 
   return node;
 }
 
-String bst_search(Queue queue, Node node, String key){
+String bst_search(Queue queue, Node node, String key, int* bin){
   if(node == NULL) return NULL;
   int cmp = string_compare(key, node->key);
   if (cmp == 0) {
     queue_relocate(queue, node);
+    (*bin) = node->binary;
     return node->val;
   }
-  if (cmp < 0 ) return bst_search(queue, node->left, key);
-  if (cmp > 0 ) return bst_search(queue, node->right, key);
+  if (cmp < 0 ) return bst_search(queue, node->left, key, bin);
+  if (cmp > 0 ) return bst_search(queue, node->right, key, bin);
   return NULL;
 }
 
