@@ -5,7 +5,7 @@
 #include "stats.h"
 
 #define SEED 0
-#define NUM_REGIONS 1000
+#define NUM_REGIONS 1
 
 /** Retorna una copia fisica del dato */
 typedef int (*CompareFunction)(void *data1, void *data2);

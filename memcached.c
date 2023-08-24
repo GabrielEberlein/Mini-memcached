@@ -13,18 +13,14 @@
 #include "commons/sock.h"
 #include "commons/common.h"
 #include "commons/parser.h"
-#include "structures/hash.h"
-#include "structures/queue.h"
 #include "structures/stats.h"
-#include "structures/node.h"
+#include "structures/structures.h"
 #include "commons/epoll.h"
 
 #define MAX_EVENTS 10
-#define MAX_THREADS 5
+#define MAX_THREADS 1
 
 struct epoll_event events[MAX_EVENTS];
-HashTable table;
-Queue priorityqueue;
 
 struct ThreadArgs{
 	int text_sock;
@@ -37,14 +33,20 @@ struct ThreadArgs{
 	int rc = read(fd, *buf + *blen, n);						\
 	if (rc < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))\
 		return 0;											\
-	if (rc <= 0){											\
-		if((*buf) != NULL) { 								\
-			free(*buf);										\									
-			*buf = NULL; }									\
-		*blen = 0;											\
-		close(fd); 											\
-		return -1;}											\
+	if (rc <= 0)											\
+		return -1;											\
 	rc; }) 													\
+
+#define READ_BINARG(fd, buf, blen, off, arg, len) ({ 												\
+	if((*blen)==off) (*buf) = realloc(*buf, off + 4);												\
+	if ((*blen) < off + 4) (*blen) += READ(fd, buf, blen, off + 4 - (*blen));						\
+	int len_net;																					\
+	memcpy(&len_net, (*buf) + off, 4);																\
+	len = ntohl(len_net);																			\
+	if((*blen)==off + 4) (*buf) = realloc(*buf, off + 4 + len);										\
+	if ((*blen) < off + 4 + len) (*blen) += READ(fd, buf, blen, off + 4 + len - (*blen));			\
+	arg = ((*buf) + off + 4);																		\
+})																									\
 
 void bin_handle(int fd, char* args[3], int lens[3]){
 	char cmd = args[0][0];
@@ -53,7 +55,7 @@ void bin_handle(int fd, char* args[3], int lens[3]){
 			stats_inc(table->stats, PUT_STAT);
 			String key = string_create(args[1], lens[1]);
 			String val = string_create(args[2], lens[2]);
-			hashtable_insert(priorityqueue, table, key, val, 1);
+			hashtable_insert(key, val, 1);
 			char k = OK;
 			write(fd, &k, 1);
 			break;
@@ -62,7 +64,7 @@ void bin_handle(int fd, char* args[3], int lens[3]){
 			stats_inc(table->stats, GET_STAT);
 			String key = string_create(args[1], lens[1]);
 			int bin;
-			String val = hashtable_search(priorityqueue, table, key, &bin);
+			String val = hashtable_search(key, &bin);
 			if(val != NULL) {
 				char k = OK;
 				write(fd, &k, 1);
@@ -78,7 +80,7 @@ void bin_handle(int fd, char* args[3], int lens[3]){
 		case DEL:{
 			stats_inc(table->stats, DEL_STAT);
 			String key = string_create(args[1], lens[1]);
-			int res = hashtable_delete(priorityqueue, table, key);
+			int res = hashtable_delete(key);
 			if(res != -1){
 				char k = OK;
 				write(fd, &k, 1);
@@ -106,20 +108,8 @@ void bin_handle(int fd, char* args[3], int lens[3]){
 	}
 }
 
-int get_argument(int fd, int* blen, char** buf, char** arg, int* len) {
-	if ((*blen) < 1 + 4) (*blen) += READ(fd, buf, blen, 1 + 4 - (*blen));
-	int len_net;
-	memcpy(&len_net, (*buf) + 1, 4);
-	(*len) = ntohl(len_net);
-	if((*blen)==5) (*buf) = realloc(*buf, 1 + 4 + (*len));
-
-	(*blen) += READ(fd, buf, blen, 1 + 4 + (*len) - (*blen));
-	(*arg) = ((*buf) + 1 + 4);
-	return 1;
-}
-
 int bin_consume(char** buf, int fd, int* blen) {
-	if(*buf==NULL) *buf = malloc(5);
+	if(*buf==NULL) *buf = safe_malloc(1);
 	char *args[3]= {NULL};
 	int lens[3] = {0};
 	if ((*blen) == 0) (*blen) += READ(fd, buf, blen, 1);
@@ -127,35 +117,18 @@ int bin_consume(char** buf, int fd, int* blen) {
 
 	switch (buf[0][0]) {
 		case PUT: {
-			if ((*blen) < 1 + 4) (*blen) += READ(fd, buf, blen, 1 + 4 - (*blen));
-			int len_net;
-			memcpy(&len_net, (*buf) + 1, 4);
-			lens[1] = ntohl(len_net);
-			if((*blen)==5) (*buf) = realloc(*buf, 1+4+lens[1]+4);
-
-			if ((*blen) < 1 + 4 + lens[1]) (*blen) += READ(fd, buf, blen, 1 + 4 + lens[1] - (*blen));
-			args[1] = ((*buf) + 1 + 4);
-			
-			if ((*blen) < 1 + 4 + lens[1] + 4) (*blen) += READ(fd, buf, blen, 1 + 4 + lens[1] + 4 - (*blen));
-			memcpy(&len_net, (*buf) + 1 + 4 + lens[1], 4);
-			lens[2] = ntohl(len_net);
-			if((*blen)==5 + lens[1] + 4) (*buf) = realloc(*buf, 1+4+lens[1]+4+lens[2]);
-			
-			(*blen) += READ(fd, buf, blen, 1 + 4 + lens[1] + 4 + lens[2] - (*blen));
-			args[2] = ((*buf) + 1 + 4 + lens[1] + 4);
-
+			READ_BINARG(fd, buf, blen, 1, args[1], lens[1]);
+			READ_BINARG(fd, buf, blen, 1 + 4 + lens[1], args[2], lens[2]);
 			bin_handle(fd,args,lens);
 			break;
 		}
 		case GET: {
-			int r;
-			if ((r = get_argument(fd, blen, buf, &args[1], &lens[1])) <= 0) return r;
+			READ_BINARG(fd, buf, blen, 1, args[1], lens[1]);
 			bin_handle(fd, args, lens);
 			break;
 		}
 		case DEL: {
-			int r;
-			if ((r = get_argument(fd, blen, buf, &args[1], &lens[1])) <= 0) return r;
+			READ_BINARG(fd, buf, blen, 1, args[1], lens[1]);
 			bin_handle(fd, args, lens);
 			break;
 		}
@@ -186,7 +159,7 @@ void text_handle(int fd, char *args[3], int nargs){
 		stats_inc(table->stats, PUT_STAT);
 		String key = string_create(args[1], strlen(args[1]));
 		String val = string_create(args[2], strlen(args[2]));
-        hashtable_insert(priorityqueue, table, key, val, 0);
+        hashtable_insert(key, val, 0);
 		char reply[2024];
         sprintf(reply, "OK\n");
 		write(fd, reply, 3);
@@ -199,7 +172,7 @@ void text_handle(int fd, char *args[3], int nargs){
 		stats_inc(table->stats, GET_STAT);
 		String key = string_create(args[1], strlen(args[1]));
 		int bin;
-        String val = hashtable_search(priorityqueue, table, key, &bin);
+        String val = hashtable_search(key, &bin);
 		if(bin == 1) {
 			write(fd, "EBINARY\n", 8);
 		} else if(val != NULL) {
@@ -213,6 +186,7 @@ void text_handle(int fd, char *args[3], int nargs){
 		}
 		else
 			write(fd, "ENOTFOUND\n", 10);
+		string_destroy(key);
 	} 
 	else if(strcmp(cmd,"DEL") == 0) {
 		if(nargs != 2) {
@@ -221,7 +195,7 @@ void text_handle(int fd, char *args[3], int nargs){
 		}
 		stats_inc(table->stats, DEL_STAT);
         String key = string_create(args[1], strlen(args[1]));
-        int res = hashtable_delete(priorityqueue, table, key);
+        int res = hashtable_delete(key);
 		char reply[2024];
         if(res != -1) {
 			sprintf(reply, "OK\n");
@@ -247,22 +221,22 @@ void text_handle(int fd, char *args[3], int nargs){
 	}
 
 	//Para printear la cola, sacarlo a la chucha cuando terminemos
-	if(priorityqueue->first && priorityqueue->last){
-		char* buf=malloc(2024);
-		char* buf2=malloc(2024);
-		Node node = priorityqueue->first;
-		while(node){
-			strncpy(buf2, node->key->data, node->key->len);
-			buf = strcat(buf,buf2);
-			node = node->prev;
-		}
-		log(1, "Queue: %s", buf);
-	}
+	// if(queue->first && queue->last){
+	// 	char* buf=safe_malloc(2024);
+	// 	char* buf2=safe_malloc(2024);
+	// 	Node node = queue->first;
+	// 	while(node){
+	// 		strncpy(buf2, node->key->data, node->key->len);
+	// 		buf = strcat(buf,buf2);
+	// 		node = node->prev;
+	// 	}
+	// 	log(1, "Queue: %s", buf);
+	// }
 }
 
 /* 0: todo ok, continua. -1 errores */
 int text_consume(char** buf, int fd, int* blen) {
-	if((*buf)==NULL) (*buf) = malloc(2048);
+	if((*buf)==NULL) (*buf) = safe_malloc(2048);
 	while (1) {
 		//int rem = sizeof *buf - blen;
 		int rem = 2048 - (*blen);
@@ -347,6 +321,7 @@ void *thread(void *args) {
 			
 			if(data->fd == text_sock || data->fd == bin_sock) {
 				csock = new_client(data->fd);
+				log(1, "Nuevo Cliente id:%d\n", csock);
 				epoll_add(efd, csock, data->mode, EPOLLIN | EPOLLET | EPOLLONESHOT);
 				epoll_mod(efd, data->fd, data->mode, data, EPOLLIN | EPOLLONESHOT);
 			} else {
@@ -354,6 +329,13 @@ void *thread(void *args) {
 				if(data->mode == TEXT) r = text_consume(&(data->buf), data->fd, &(data->blen));
 				if(data->mode == BIN) r = bin_consume(&(data->buf), data->fd, &(data->blen));
 				if(r != -1) epoll_mod(efd, data->fd, data->mode, data, EPOLLIN | EPOLLET | EPOLLONESHOT);
+				else{
+					if((data->buf) != NULL) {
+						free(data->buf);												
+						data->buf = NULL; }		
+					data->blen = 0;									
+					close(data->fd); 									
+				}
 			}
 		}
 	}
@@ -365,7 +347,7 @@ void server(int text_sock, int bin_sock) {
 	epoll_add(efd, text_sock, TEXT, EPOLLIN | EPOLLONESHOT);
 	epoll_add(efd, bin_sock, BIN, EPOLLIN | EPOLLONESHOT);
 
-	struct ThreadArgs *args = (struct ThreadArgs*)malloc(sizeof(struct ThreadArgs));;
+	struct ThreadArgs *args = (struct ThreadArgs*)safe_malloc(sizeof(struct ThreadArgs));
 	args->text_sock = text_sock;
 	args->bin_sock = bin_sock;
 	args->efd = efd;
@@ -392,10 +374,13 @@ int main(int argc, char **argv)
 	int text_sock, bin_sock;
 
 	__loglevel = 2;
+	//Magic number: 11239424
+	limit_mem(11400000);
 
 	handle_signals();
-	table = hashtable_create(1<<20);
-	priorityqueue = queue_create();
+	hashtable_create(1);
+	queue_create();
+
 
 	text_sock = mk_tcp_sock(mc_lport_text);
 	if (text_sock < 0)

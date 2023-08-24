@@ -71,6 +71,7 @@ HashTable hashtable_create(unsigned capacity) {
 void hashtable_insert(Queue queue, HashTable table, String key, String val, int bin) {
   unsigned idx = table->hash(key) % table->capacity;
   log(1,"Hash: %d",idx);
+  log(1,"Range: %d",table->range);
   int region = idx / table->range;
   pthread_mutex_lock(table->locks+region);
   table->elems[idx] = bst_insert(queue, table->elems[idx], table->stats, key, val, bin);

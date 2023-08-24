@@ -4,6 +4,8 @@
 
 enum modes {TEXT, BIN};
 
+
+
 // Estructura Data
 /*
     Guarda los datos de cada File Descriptor monitoreado por Epoll

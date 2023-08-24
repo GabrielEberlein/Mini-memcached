@@ -1,4 +1,5 @@
 #include "epoll.h"
+#include "../structures/structures.h"
 
 int epoll_init(){
     int efd = epoll_create1(0);
@@ -13,7 +14,7 @@ int epoll_init(){
 void epoll_add(int efd, int sock, enum modes mode, int events){
     struct epoll_event ev;
     ev.events = events;
-	Data* data = malloc(sizeof(Data));
+	Data* data = safe_malloc(sizeof(Data));
     data->fd = sock;
     data->mode = mode;
 	data->buf = NULL;

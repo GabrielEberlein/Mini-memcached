@@ -25,15 +25,6 @@ void queue_push(Queue queue, Node node) {
     pthread_mutex_unlock(&(queue->lock));
 }
 
-void queue_pop(Queue queue) {
-    pthread_mutex_lock(&(queue->lock));
-    if (queue->first != NULL) {
-        Node secondNode = queue->first->prev;
-        queue->first = secondNode;
-    }
-    pthread_mutex_unlock(&(queue->lock));
-}
-
 void queue_relocate(Queue queue, Node node) {
     pthread_mutex_lock(&(queue->lock));
     if (node->prev != NULL) {

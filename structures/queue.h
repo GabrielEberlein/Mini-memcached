@@ -35,12 +35,6 @@ Queue queue_create();
 */
 void queue_push(Queue queue, Node node);
 
-// pop_queue : Queue* -> int
-/*
-  Elimina el ultimo elemento de la cola
-*/
-void queue_pop(Queue queue);
-
 // relocate_queue : Queue*, Node -> NULL
 /*
   Recoloca el Nodo especificado en la primer posicion de la cola
