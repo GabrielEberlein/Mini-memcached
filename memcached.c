@@ -18,7 +18,7 @@
 #include "commons/epoll.h"
 
 #define MAX_EVENTS 10
-#define MAX_THREADS 5
+#define MAX_THREADS 1
 
 struct epoll_event events[MAX_EVENTS];
 
@@ -60,9 +60,9 @@ void bin_handle(int fd, char* args[3], int lens[3]){
 		}
 		case GET:{
 			stats_inc(table->stats, GET_STAT);
-			int bin;
-			String val = hashtable_search(args[1], lens[1], &bin);
-			if(val != NULL) {
+			Node node = hashtable_search(args[1], lens[1]);
+			if(node != NULL) {
+				String val = node->val;
 				char k = OK;
 				write(fd, &k, 1);
 				int len_net = htonl(val->len);
@@ -165,18 +165,20 @@ void text_handle(int fd, char *args[3], int lens[3], int nargs){
 			return;
 		}
 		stats_inc(table->stats, GET_STAT);
-		int bin;
 		log(1, "Busco, Data: %s, Largo: %d", args[1], lens[1]);
-        String val = hashtable_search(args[1], lens[1], &bin);
-		if(bin == 1) {
-			write(fd, "EBINARY\n", 8);
-		} else if(val != NULL) {
-			if(val->len > 2045) {
-				write(fd, "EBIG\n", 5);
-			} else {
-				write(fd, "OK ", 3);
-				write(fd, val->data, val->len);
-				write(fd,"\n",1);
+        Node node = hashtable_search(args[1], lens[1]);
+		if(node != NULL){
+			if(node->binary == 1) {
+				write(fd, "EBINARY\n", 8);
+			} else{
+				String val = node->val;
+				if(val->len > 2045) {
+					write(fd, "EBIG\n", 5);
+				} else {
+					write(fd, "OK ", 3);
+					write(fd, val->data, val->len);
+					write(fd,"\n",1);
+				}
 			}
 		}
 		else write(fd, "ENOTFOUND\n", 10);
@@ -367,7 +369,7 @@ int main(int argc, char **argv)
 
 	__loglevel = 2;
 	//Magic number: 11400000 5 puts
-	limit_mem(50000000);
+	limit_mem(11400000);
 	signal(SIGPIPE, handle_signals);
 	hashtable_create(1);
 	queue_create();

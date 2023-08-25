@@ -207,16 +207,15 @@ int bst_delete(Node* node, Stats stats, char* key, int keyLen){
   return 0;
 }
 
-String bst_search(Node node, char* key, int keyLen, int* bin){
+Node bst_search(Node node, char* key, int keyLen){
   if(node == NULL) return NULL;
   int cmp = string_compare(key, keyLen, node->key->data, node->key->len);
   if (cmp == 0) {
     queue_relocate(node);
-    (*bin) = node->binary;
-    return node->val;
+    return node;
   }
-  if (cmp < 0 ) return bst_search(node->left, key, keyLen, bin);
-  if (cmp > 0 ) return bst_search(node->right, key, keyLen, bin);
+  if (cmp < 0 ) return bst_search(node->left, key, keyLen);
+  if (cmp > 0 ) return bst_search(node->right, key, keyLen);
   return NULL;
 }
 
@@ -314,16 +313,24 @@ unsigned hash_word(char* data, int len) {
 }
 
 void hashtable_insert(char* key, int keyLen, char* val, int valLen, int bin) {
-  Node newNode;
-  while((newNode = node_create(key, keyLen, val, valLen, bin))==NULL && queue->first != NULL){
-    hashtable_delete(queue->first->key->data, queue->first->key->len);
-    log(1,"LOOP");
+  Node newNode = hashtable_search(key, keyLen);
+
+  if(newNode == NULL){
+    while((newNode = node_create(key, keyLen, val, valLen, bin))==NULL && queue->first != NULL){
+      hashtable_delete(queue->first->key->data, queue->first->key->len);
+      log(1,"LOOP");
+    }
+    unsigned idx = table->hash(key, keyLen) % table->capacity;
+    int region = idx / table->range;
+    pthread_mutex_lock(table->locks+region);
+    table->elems[idx] = bst_insert(table->elems[idx], newNode, table->stats, bin);
+    pthread_mutex_unlock(table->locks+region);
+  }else{
+    newNode->binary = bin;
+    string_destroy(newNode->val);
+    newNode->val = string_create(val, valLen);
   }
-  unsigned idx = table->hash(key, keyLen) % table->capacity;
-  int region = idx / table->range;
-  pthread_mutex_lock(table->locks+region);
-  table->elems[idx] = bst_insert(table->elems[idx], newNode, table->stats, bin);
-  pthread_mutex_unlock(table->locks+region);
+
 }
 
 int hashtable_delete(char* key, int keyLen) {
@@ -335,12 +342,12 @@ int hashtable_delete(char* key, int keyLen) {
   return res;
 }
 
-String hashtable_search(char* key, int keyLen, int* bin) {
+Node hashtable_search(char* key, int keyLen) {
   unsigned idx = table->hash(key, keyLen) % table->capacity;
   log(1,"Hash: %d",idx);
   int region = idx / table->range;
   pthread_mutex_lock(table->locks+region);
-  String value = bst_search(table->elems[idx], key, keyLen, bin);
+  Node value = bst_search(table->elems[idx], key, keyLen);
   pthread_mutex_unlock(table->locks+region);
   return value;
 }

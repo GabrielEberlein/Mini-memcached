@@ -160,7 +160,7 @@ int bst_delete(Node* node, Stats stats, char* key, int keyLen);
     Si lo encuentra, devuelve el valor y reposiciona el nodo al frente de la cola
     Si no lo encuentra, devuelve NULL
 */
-String bst_search(Node node, char* key, int keyLen, int* bin);
+Node bst_search(Node node, char* key, int keyLen);
 
 // free_bst : Node -> NULL
 /*
@@ -218,7 +218,7 @@ void hashtable_insert(char* key, int keyLen, char* val, int valLen, int bin);
 /*
   Busca un valor en la Tabla Hash por su Key, retorna el mismo
 */
-String hashtable_search(char* key, int keyLen, int* bin);
+Node hashtable_search(char* key, int keyLen);
 
 // hashtable_delete : Queue*, HashTable, String -> int
 /*
