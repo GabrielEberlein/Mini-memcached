@@ -47,11 +47,13 @@ void string_destroy(String string) {
 }
 
 int string_compare(char* d1, int l1, char* d2, int l2) {
+  log(1, "string_compare d1:%s l1:%d d2:%s l2:%d", d1, l1, d2, l2);
   if (l1 != l2) return l1 - l2;
   return memcmp(d1, d2, l1);
 }
 
 Node node_create(char* key, int keyLen, char* val, int valLen, int bin) {
+  log(1, "node_create");
   Node newNode = malloc(sizeof(struct _Node));
   if(newNode == NULL) return NULL;
 
@@ -153,7 +155,9 @@ void queue_relocate(Node node) {
 /--------------------------------------------*/
 
 Node bst_insert(Node root, Node newNode, Stats stats, int bin) {
+  log(1, "bst_insert root-len: %d node-len:%d", root->val->len, newNode->val->len);
   if (root == NULL){
+    log(1, "root == NULL");
     queue_push(newNode);
     stats_inc(stats, KEYS_STAT);
     return newNode;
@@ -161,15 +165,23 @@ Node bst_insert(Node root, Node newNode, Stats stats, int bin) {
 
   int cmp = string_compare(root->key->data, root->key->len, newNode->key->data, newNode->key->len);
   if (cmp == 0) {
+    log(1, "cmp == 0");
     newNode->left = root->left;
     newNode->right = root->right;
     queue_delete(root);
     queue_push(newNode);
     return newNode;
   }
-  if (cmp > 0 ) root->left = bst_insert(root->left, newNode, stats, bin);
-  if (cmp < 0 ) root->right = bst_insert(root->right, newNode, stats, bin);
+  if (cmp > 0 ) {
+    log(1, "cmp > 0");
+    root->left = bst_insert(root->left, newNode, stats, bin);
+  }
+  if (cmp < 0 ) {
+    log(1, "cmp < 0");
+    root->right = bst_insert(root->right, newNode, stats, bin);
+  }
 
+  log(1, "La cague cmp:%d k1:%s l1:%d k2:%s l2:%d", cmp, root->key->data, root->key->len, newNode->key->data, newNode->key->len);
   return root;
 }
 
@@ -192,6 +204,7 @@ Node bst_replace(Node node) {
 }
 
 int bst_delete(Node* node, Stats stats, char* key, int keyLen){
+  log(1, "bst_delete");
   if((*node)==NULL) return -1;
   int cmp = string_compare((*node)->key->data, (*node)->key->len, key, keyLen);
 
@@ -208,8 +221,13 @@ int bst_delete(Node* node, Stats stats, char* key, int keyLen){
 }
 
 Node bst_search(Node node, char* key, int keyLen){
-  if(node == NULL) return NULL;
+  log(1, "bst_search key:%s keyLen:%d", key, keyLen);
+  if(node == NULL) {
+    log(1, "node == NULL");
+    return NULL;
+  }
   int cmp = string_compare(key, keyLen, node->key->data, node->key->len);
+  log(1, "Llego");
   if (cmp == 0) {
     queue_relocate(node);
     return node;
@@ -313,6 +331,8 @@ unsigned hash_word(char* data, int len) {
 }
 
 void hashtable_insert(char* key, int keyLen, char* val, int valLen, int bin) {
+  if(val == NULL) log(1, "Auch");
+  log(1, "hashtable_insert key:%s keyLen:%d", key, keyLen);
   Node newNode = hashtable_search(key, keyLen);
 
   if(newNode == NULL){
@@ -330,7 +350,6 @@ void hashtable_insert(char* key, int keyLen, char* val, int valLen, int bin) {
     string_destroy(newNode->val);
     newNode->val = string_create(val, valLen);
   }
-
 }
 
 int hashtable_delete(char* key, int keyLen) {
@@ -343,8 +362,8 @@ int hashtable_delete(char* key, int keyLen) {
 }
 
 Node hashtable_search(char* key, int keyLen) {
+  log(1, "hashtable_search key:%s keyLen:%d", key, keyLen);
   unsigned idx = table->hash(key, keyLen) % table->capacity;
-  log(1,"Hash: %d",idx);
   int region = idx / table->range;
   pthread_mutex_lock(table->locks+region);
   Node value = bst_search(table->elems[idx], key, keyLen);

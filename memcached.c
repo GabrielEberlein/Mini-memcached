@@ -52,6 +52,7 @@ void bin_handle(int fd, char* args[3], int lens[3]){
 	char cmd = args[0][0];
 	switch (cmd) {
 		case PUT: {
+			log(1, "PUTeando");
 			stats_inc(table->stats, PUT_STAT);
 			hashtable_insert(args[1], lens[1], args[2], lens[2], 1);
 			char k = OK;
@@ -322,6 +323,7 @@ void *thread(void *args) {
 				int r;
 				if(data->mode == TEXT) r = text_consume(&(data->buf), data->fd, &(data->blen));
 				if(data->mode == BIN) r = bin_consume(&(data->buf), data->fd, &(data->blen));
+				log(1, "r:%d", r);
 				if(r != -1) epoll_mod(efd, data->fd, data->mode, data, EPOLLIN | EPOLLET | EPOLLONESHOT);
 				else{
 					if((data->buf) != NULL) {
