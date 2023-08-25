@@ -63,7 +63,7 @@ String string_create(char* data, int len);
     - 1 si el primero es mayor
     - (-1) si el segundo es mayor
 */
-int string_compare(String k1, String k2);
+int string_compare(char* d1, int l1, char* d2, int l2);
 
 // free_string : String -> NULL
 /*
@@ -75,7 +75,7 @@ void string_destroy(String string);
 /*
     Crea e inicializa un nuevo Nodo con los valores dados
 */
-Node node_create(String key, String val, int bin);
+Node node_create(char* key, int keyLen, char* val, int valLen, int bin);
 
 // delete_node -> Queue*, Node -> Node
 /*
@@ -145,14 +145,14 @@ void queue_relocate(Node node);
     Inserta un nuevo nodo en el BST o actualiza el valor si el mismo ya existe
     y reposicionandolo al frente de la cola
 */
-Node bst_insert(Node node, Stats stats, String key, String val, int bin);
+Node bst_insert(Node root, Node newNode, Stats stats, int bin);
 
 // delete_bst -> Queue, Node*, String -> int
 /*
     Busca y borra un nodo de un BST
     Devuelve 0 si el mismo fue encontrado, (-1) en caso contrario
 */
-int bst_delete(Node* node, Stats stats, String key);
+int bst_delete(Node* node, Stats stats, char* key, int keyLen);
 
 // search_bst : Queue, Node, String -> String
 /*
@@ -160,7 +160,7 @@ int bst_delete(Node* node, Stats stats, String key);
     Si lo encuentra, devuelve el valor y reposiciona el nodo al frente de la cola
     Si no lo encuentra, devuelve NULL
 */
-String bst_search(Node node, String key, int* bin);
+String bst_search(Node node, char* key, int keyLen, int* bin);
 
 // free_bst : Node -> NULL
 /*
@@ -181,7 +181,7 @@ typedef int (*CompareFunction)(void *data1, void *data2);
  * positivo si dato1 > dato2  */
 typedef void *(*DestructorFunction)(void *data);
 /** Libera la memoria alocada para el dato */
-typedef unsigned (*HashFunction)(void *data);
+typedef unsigned (*HashFunction)(void *data, int len);
 /** Retorna un entero sin signo para el dato */
 
 // Estructura Tabla Hash
@@ -200,7 +200,7 @@ struct _HashTable {
 };
 typedef struct _HashTable *HashTable;
 
-unsigned hash_word(String word);
+unsigned hash_word(char* data, int len);
 
 // hashtable_create : unsigned -> HashTable
 /*
@@ -212,20 +212,20 @@ void hashtable_create(unsigned capacity);
 /*
   Agrega el par (Key, Value) a la Tabla Hash
 */
-void hashtable_insert(String key, String val, int bin);
+void hashtable_insert(char* key, int keyLen, char* val, int valLen, int bin);
 
 // hashtable_search : Queue*, HashTable, String -> String
 /*
   Busca un valor en la Tabla Hash por su Key, retorna el mismo
 */
-String hashtable_search(String key, int* bin);
+String hashtable_search(char* key, int keyLen, int* bin);
 
 // hashtable_delete : Queue*, HashTable, String -> int
 /*
   Borra un valor de la Tabla Hash a partir de su Key
   Si el mismo no se encuentra, se devuelve (-1), en caso contrario, 0
 */
-int hashtable_delete(String key);
+int hashtable_delete(char* key, int keyLen);
 
 // hashtable_destroy : HashTable -> NULL
 /*

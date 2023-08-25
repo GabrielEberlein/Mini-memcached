@@ -18,7 +18,7 @@
 #include "commons/epoll.h"
 
 #define MAX_EVENTS 10
-#define MAX_THREADS 1
+#define MAX_THREADS 5
 
 struct epoll_event events[MAX_EVENTS];
 
@@ -38,12 +38,12 @@ struct ThreadArgs{
 	rc; }) 													\
 
 #define READ_BINARG(fd, buf, blen, off, arg, len) ({ 												\
-	if((*blen)==off) (*buf) = realloc(*buf, off + 4);												\
+	if((*blen)==off) (*buf) = safe_realloc(*buf, off + 4);												\
 	if ((*blen) < off + 4) (*blen) += READ(fd, buf, blen, off + 4 - (*blen));						\
 	int len_net;																					\
 	memcpy(&len_net, (*buf) + off, 4);																\
 	len = ntohl(len_net);																			\
-	if((*blen)==off + 4) (*buf) = realloc(*buf, off + 4 + len);										\
+	if((*blen)==off + 4) (*buf) = safe_realloc(*buf, off + 4 + len);										\
 	if ((*blen) < off + 4 + len) (*blen) += READ(fd, buf, blen, off + 4 + len - (*blen));			\
 	arg = ((*buf) + off + 4);																		\
 })																									\
@@ -53,18 +53,15 @@ void bin_handle(int fd, char* args[3], int lens[3]){
 	switch (cmd) {
 		case PUT: {
 			stats_inc(table->stats, PUT_STAT);
-			String key = string_create(args[1], lens[1]);
-			String val = string_create(args[2], lens[2]);
-			hashtable_insert(key, val, 1);
+			hashtable_insert(args[1], lens[1], args[2], lens[2], 1);
 			char k = OK;
 			write(fd, &k, 1);
 			break;
 		}
 		case GET:{
 			stats_inc(table->stats, GET_STAT);
-			String key = string_create(args[1], lens[1]);
 			int bin;
-			String val = hashtable_search(key, &bin);
+			String val = hashtable_search(args[1], lens[1], &bin);
 			if(val != NULL) {
 				char k = OK;
 				write(fd, &k, 1);
@@ -79,8 +76,7 @@ void bin_handle(int fd, char* args[3], int lens[3]){
 		}
 		case DEL:{
 			stats_inc(table->stats, DEL_STAT);
-			String key = string_create(args[1], lens[1]);
-			int res = hashtable_delete(key);
+			int res = hashtable_delete(args[1], lens[1]);
 			if(res != -1){
 				char k = OK;
 				write(fd, &k, 1);
@@ -148,7 +144,7 @@ int bin_consume(char** buf, int fd, int* blen) {
 	return 0;
 }
 
-void text_handle(int fd, char *args[3], int nargs){
+void text_handle(int fd, char *args[3], int lens[3], int nargs){
 	char *cmd = args[0];
 	
     if(strcmp(cmd,"PUT") == 0) {
@@ -157,9 +153,8 @@ void text_handle(int fd, char *args[3], int nargs){
 			return;
 		}
 		stats_inc(table->stats, PUT_STAT);
-		String key = string_create(args[1], strlen(args[1]));
-		String val = string_create(args[2], strlen(args[2]));
-        hashtable_insert(key, val, 0);
+		log(1, "Inserto, Data: %s, Largo: %d, Data: %s, Largo: %d", args[1], lens[1], args[2], lens[2]);
+        hashtable_insert(args[1], lens[1], args[2], lens[2], 0);
 		char reply[2024];
         sprintf(reply, "OK\n");
 		write(fd, reply, 3);
@@ -170,9 +165,9 @@ void text_handle(int fd, char *args[3], int nargs){
 			return;
 		}
 		stats_inc(table->stats, GET_STAT);
-		String key = string_create(args[1], strlen(args[1]));
 		int bin;
-        String val = hashtable_search(key, &bin);
+		log(1, "Busco, Data: %s, Largo: %d", args[1], lens[1]);
+        String val = hashtable_search(args[1], lens[1], &bin);
 		if(bin == 1) {
 			write(fd, "EBINARY\n", 8);
 		} else if(val != NULL) {
@@ -184,9 +179,7 @@ void text_handle(int fd, char *args[3], int nargs){
 				write(fd,"\n",1);
 			}
 		}
-		else
-			write(fd, "ENOTFOUND\n", 10);
-		string_destroy(key);
+		else write(fd, "ENOTFOUND\n", 10);
 	} 
 	else if(strcmp(cmd,"DEL") == 0) {
 		if(nargs != 2) {
@@ -194,8 +187,7 @@ void text_handle(int fd, char *args[3], int nargs){
 			return;
 		}
 		stats_inc(table->stats, DEL_STAT);
-        String key = string_create(args[1], strlen(args[1]));
-        int res = hashtable_delete(key);
+        int res = hashtable_delete(args[1], lens[1]);
 		char reply[2024];
         if(res != -1) {
 			sprintf(reply, "OK\n");
@@ -261,7 +253,7 @@ int text_consume(char** buf, int fd, int* blen) {
 			int ntok;
 			ntok = text_parser(p0, toks, lens);
 
-			text_handle(fd, toks, ntok);
+			text_handle(fd, toks, lens, ntok);
 
 			nlen -= len + 1;
 			p0 = p;
@@ -296,8 +288,8 @@ void limit_mem(size_t limit)
     }
 }
 
-void handle_signals() {
-	/*Capturar y manejar  SIGPIPE */
+void handle_signals(int s) {
+	log(1, "SIGPIPE ERROR");
 }
 
 void *thread(void *args) {
@@ -374,13 +366,11 @@ int main(int argc, char **argv)
 	int text_sock, bin_sock;
 
 	__loglevel = 2;
-	//Magic number: 11239424
-	limit_mem(11400000);
-
-	handle_signals();
+	//Magic number: 11400000 5 puts
+	limit_mem(50000000);
+	signal(SIGPIPE, handle_signals);
 	hashtable_create(1);
 	queue_create();
-
 
 	text_sock = mk_tcp_sock(mc_lport_text);
 	if (text_sock < 0)
