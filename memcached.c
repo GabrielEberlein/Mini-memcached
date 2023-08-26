@@ -30,22 +30,21 @@ struct ThreadArgs{
 
 /* Macro interna */
 #define READ(fd, buf, blen, n) ({							\
-	int rc = read(fd, *buf + *blen, n);						\
+	int rc = read(fd, buf + blen, n);						\
 	if (rc < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))\
 		return 0;											\
 	if (rc <= 0)											\
 		return -1;											\
 	rc; }) 													\
 
-#define READ_BINARG(fd, buf, blen, off, arg, len) ({ 												\
-	if((*blen)==off) (*buf) = safe_realloc(*buf, off + 4);											\
-	if ((*blen) < off + 4) (*blen) += READ(fd, buf, blen, off + 4 - (*blen));						\
+#define READ_BINARG(fd, buf, blen, off, len) ({ 												\
+	if(blen==off) buf = safe_realloc(buf, off + 4);											\
+	if (blen < off + 4) blen += READ(fd, buf, blen, off + 4 - blen);						\
 	int len_net;																					\
-	memcpy(&len_net, (*buf) + off, 4);																\
+	memcpy(&len_net, buf + off, 4);																\
 	len = ntohl(len_net);																			\
-	if((*blen)==off + 4) (*buf) = safe_realloc(*buf, off + 4 + len);								\
-	if ((*blen) < off + 4 + len) (*blen) += READ(fd, buf, blen, off + 4 + len - (*blen));			\
-	arg = ((*buf) + off + 4);																		\
+	if(blen==off + 4) buf = safe_realloc(buf, off + 4 + len);								\
+	if (blen < off + 4 + len) blen += READ(fd, buf, blen, off + 4 + len - blen);			\
 })																									\
 
 void bin_handle(int fd, char* args[3], int lens[3]){
@@ -116,32 +115,35 @@ int bin_consume(char** buf, int fd, int* blen) {
 	if(*buf==NULL) *buf = safe_malloc(1);
 	char *args[3]= {NULL};
 	int lens[3] = {0};
-	if ((*blen) == 0) (*blen) += READ(fd, buf, blen, 1);
-	args[0] = (*buf);
+	if ((*blen) == 0) (*blen) += READ(fd, *buf, *blen, 1);
 
 	log(1, "buf: %d", buf[0][0]);
 	switch (buf[0][0]) {
 		case PUT: {
-			log(1, "before args: %d", args[0][0]);
-			READ_BINARG(fd, buf, blen, 1, args[1], lens[1]);
-			READ_BINARG(fd, buf, blen, 1 + 4 + lens[1], args[2], lens[2]);
-			log(1, "after args: %d", args[0][0]);
+			READ_BINARG(fd, *buf, *blen, 1, lens[1]);
+			READ_BINARG(fd, *buf, *blen, 1 + 4 + lens[1], lens[2]);
+			args[0]=*buf;
+			args[1]=*buf+1+4;
+			args[2]=*buf+1+4+lens[1]+4;
 			bin_handle(fd,args,lens);
 			break;
 		}
 		case GET: {
-			log(1, "before args: %d", args[0][0]);
-			READ_BINARG(fd, buf, blen, 1, args[1], lens[1]);
-			log(1, "after args: %d", args[0][0]);
+			READ_BINARG(fd, *buf, *blen, 1, lens[1]);
+			args[0] = *buf;
+			args[1] = *buf+1+4;
 			bin_handle(fd, args, lens);
 			break;
 		}
 		case DEL: {
-			READ_BINARG(fd, buf, blen, 1, args[1], lens[1]);
+			READ_BINARG(fd, *buf, *blen, 1, lens[1]);
+			args[0] = *buf;
+			args[1] = *buf+1+4;
 			bin_handle(fd, args, lens);
 			break;
 		}
 		case STATS: {
+			args[0] = *buf;
 			bin_handle(fd,args,lens);
 			break;
 		}
@@ -253,8 +255,7 @@ int text_consume(char** buf, int fd, int* blen) {
 			write(fd, "EINVALID\n", 7);
 			return -1;
 		}
-		int nread = READ(fd, buf, blen, rem);	
-		(*blen) += nread;
+		(*blen) += READ(fd, buf, *blen, rem);	
 		char *p, *p0 = (*buf);
 		int nlen = (*blen);
 
