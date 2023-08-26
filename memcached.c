@@ -18,7 +18,7 @@
 #include "commons/epoll.h"
 
 #define MAX_EVENTS 10
-#define MAX_THREADS 1
+#define MAX_THREADS 5
 
 struct epoll_event events[MAX_EVENTS];
 
@@ -38,12 +38,12 @@ struct ThreadArgs{
 	rc; }) 													\
 
 #define READ_BINARG(fd, buf, blen, off, arg, len) ({ 												\
-	if((*blen)==off) (*buf) = safe_realloc(*buf, off + 4);												\
+	if((*blen)==off) (*buf) = safe_realloc(*buf, off + 4);											\
 	if ((*blen) < off + 4) (*blen) += READ(fd, buf, blen, off + 4 - (*blen));						\
 	int len_net;																					\
 	memcpy(&len_net, (*buf) + off, 4);																\
 	len = ntohl(len_net);																			\
-	if((*blen)==off + 4) (*buf) = safe_realloc(*buf, off + 4 + len);										\
+	if((*blen)==off + 4) (*buf) = safe_realloc(*buf, off + 4 + len);								\
 	if ((*blen) < off + 4 + len) (*blen) += READ(fd, buf, blen, off + 4 + len - (*blen));			\
 	arg = ((*buf) + off + 4);																		\
 })																									\
@@ -64,6 +64,7 @@ void bin_handle(int fd, char* args[3], int lens[3]){
 			Node node = hashtable_search(args[1], lens[1]);
 			if(node != NULL) {
 				String val = node->val;
+				log(1,"Gettie: %s, %d", val->data, val->len);
 				char k = OK;
 				write(fd, &k, 1);
 				int len_net = htonl(val->len);
@@ -71,6 +72,7 @@ void bin_handle(int fd, char* args[3], int lens[3]){
 				write(fd, val->data, val->len);
 			} else {
 				char enf = ENOTFOUND;
+				log(1,"NOTFOUND :(");
 				write(fd, &enf, 1);
 			}
 			break;
@@ -371,7 +373,7 @@ int main(int argc, char **argv)
 
 	__loglevel = 2;
 	//Magic number: 11400000 5 puts
-	limit_mem(11400000);
+	limit_mem(1111400000);
 	signal(SIGPIPE, handle_signals);
 	hashtable_create(1);
 	queue_create();

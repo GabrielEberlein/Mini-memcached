@@ -145,7 +145,7 @@ void queue_relocate(Node node);
     Inserta un nuevo nodo en el BST o actualiza el valor si el mismo ya existe
     y reposicionandolo al frente de la cola
 */
-Node bst_insert(Node root, Node newNode, Stats stats, int bin);
+Node bst_insert(Node root, Node newNode, Stats stats);
 
 // delete_bst -> Queue, Node*, String -> int
 /*

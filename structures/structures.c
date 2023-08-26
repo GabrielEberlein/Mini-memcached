@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include<unistd.h>
 #include "../commons/log.h"
 #include "structures.h"
 
@@ -13,12 +14,16 @@ Queue queue = NULL;
 
 void* safe_malloc(size_t size){
   void* ptr=NULL;
-  while((ptr=malloc(size)) == NULL && queue->first != NULL) hashtable_delete(queue->first->key->data, queue->first->key->len);
+  while((ptr=malloc(size)) == NULL && queue->first != NULL) {
+    hashtable_delete(queue->first->key->data, queue->first->key->len);
+  }
   return ptr;
 }
 
 void* safe_realloc(void* ptr, size_t size){
-  while((ptr=realloc(ptr, size)) == NULL && queue->first != NULL) hashtable_delete(queue->first->key->data, queue->first->key->len);
+  while((ptr=realloc(ptr, size)) == NULL && queue->first != NULL){
+    hashtable_delete(queue->first->key->data, queue->first->key->len);
+  }
   return ptr;
 }
 
@@ -47,13 +52,11 @@ void string_destroy(String string) {
 }
 
 int string_compare(char* d1, int l1, char* d2, int l2) {
-  log(1, "string_compare d1:%s l1:%d d2:%s l2:%d", d1, l1, d2, l2);
   if (l1 != l2) return l1 - l2;
   return memcmp(d1, d2, l1);
 }
 
 Node node_create(char* key, int keyLen, char* val, int valLen, int bin) {
-  log(1, "node_create");
   Node newNode = malloc(sizeof(struct _Node));
   if(newNode == NULL) return NULL;
 
@@ -154,34 +157,17 @@ void queue_relocate(Node node) {
 /               BST FUNCTIONS                 /
 /--------------------------------------------*/
 
-Node bst_insert(Node root, Node newNode, Stats stats, int bin) {
-  log(1, "bst_insert root-len: %d node-len:%d", root->val->len, newNode->val->len);
+Node bst_insert(Node root, Node newNode, Stats stats) {
   if (root == NULL){
-    log(1, "root == NULL");
     queue_push(newNode);
     stats_inc(stats, KEYS_STAT);
     return newNode;
   }
 
   int cmp = string_compare(root->key->data, root->key->len, newNode->key->data, newNode->key->len);
-  if (cmp == 0) {
-    log(1, "cmp == 0");
-    newNode->left = root->left;
-    newNode->right = root->right;
-    queue_delete(root);
-    queue_push(newNode);
-    return newNode;
-  }
-  if (cmp > 0 ) {
-    log(1, "cmp > 0");
-    root->left = bst_insert(root->left, newNode, stats, bin);
-  }
-  if (cmp < 0 ) {
-    log(1, "cmp < 0");
-    root->right = bst_insert(root->right, newNode, stats, bin);
-  }
+  if (cmp > 0 ) root->left = bst_insert(root->left, newNode, stats);
+  if (cmp < 0 ) root->right = bst_insert(root->right, newNode, stats);
 
-  log(1, "La cague cmp:%d k1:%s l1:%d k2:%s l2:%d", cmp, root->key->data, root->key->len, newNode->key->data, newNode->key->len);
   return root;
 }
 
@@ -194,22 +180,24 @@ Node bst_replace(Node node) {
       prev = replacement;
       replacement = replacement->right;
     }
-    if(prev) prev->right = replacement->left;
+    if(prev){
+      prev->right = replacement->left;
       replacement->left = node->left;
-      replacement->right = node->right;
-    } else {
-      replacement = node->right;
     }
+    replacement->right = node->right;
+  } else {
+    replacement = node->right;
+  }
   return replacement;
 }
 
 int bst_delete(Node* node, Stats stats, char* key, int keyLen){
-  log(1, "bst_delete");
   if((*node)==NULL) return -1;
   int cmp = string_compare((*node)->key->data, (*node)->key->len, key, keyLen);
 
   if (cmp == 0) {
     Node replacement = bst_replace((*node));
+
     queue_delete((*node));
     (*node) = replacement;
     stats_dec(stats, KEYS_STAT);
@@ -221,13 +209,10 @@ int bst_delete(Node* node, Stats stats, char* key, int keyLen){
 }
 
 Node bst_search(Node node, char* key, int keyLen){
-  log(1, "bst_search key:%s keyLen:%d", key, keyLen);
   if(node == NULL) {
-    log(1, "node == NULL");
     return NULL;
   }
   int cmp = string_compare(key, keyLen, node->key->data, node->key->len);
-  log(1, "Llego");
   if (cmp == 0) {
     queue_relocate(node);
     return node;
@@ -331,24 +316,32 @@ unsigned hash_word(char* data, int len) {
 }
 
 void hashtable_insert(char* key, int keyLen, char* val, int valLen, int bin) {
-  if(val == NULL) log(1, "Auch");
-  log(1, "hashtable_insert key:%s keyLen:%d", key, keyLen);
   Node newNode = hashtable_search(key, keyLen);
 
-  if(newNode == NULL){
+  int i;
+  if(newNode == NULL) {
     while((newNode = node_create(key, keyLen, val, valLen, bin))==NULL && queue->first != NULL){
-      hashtable_delete(queue->first->key->data, queue->first->key->len);
-      log(1,"LOOP");
+      pthread_mutex_lock(&table->locks[table->hash(queue->first->key->data, queue->first->key->len) % table->capacity / table->range]);
+      int region = (table->hash(queue->first->key->data, queue->first->key->len) % table->capacity) / table->range;
+      i = bst_delete(&(table->elems[table->hash(queue->first->key->data, queue->first->key->len) % table->capacity]), table->stats, queue->first->key->data, queue->first->key->len);
+      pthread_mutex_unlock(&table->locks[region]);
     }
     unsigned idx = table->hash(key, keyLen) % table->capacity;
     int region = idx / table->range;
-    pthread_mutex_lock(table->locks+region);
-    table->elems[idx] = bst_insert(table->elems[idx], newNode, table->stats, bin);
-    pthread_mutex_unlock(table->locks+region);
-  }else{
+    pthread_mutex_lock(&table->locks[region]);
+    table->elems[idx] = bst_insert(table->elems[idx], newNode, table->stats);
+    pthread_mutex_unlock(&table->locks[region]);
+  } else {
     newNode->binary = bin;
     string_destroy(newNode->val);
-    newNode->val = string_create(val, valLen);
+    String newValue;
+    while((newValue = string_create(val, valLen))==NULL && queue->first != NULL){
+      pthread_mutex_lock(&table->locks[table->hash(queue->first->key->data, queue->first->key->len) % table->capacity / table->range]);
+      int region = (table->hash(queue->first->key->data, queue->first->key->len) % table->capacity) / table->range;
+      i = bst_delete(&(table->elems[table->hash(queue->first->key->data, queue->first->key->len) % table->capacity]), table->stats, queue->first->key->data, queue->first->key->len);
+      pthread_mutex_unlock(&table->locks[region]);
+    }
+    newNode->val = newValue;
   }
 }
 

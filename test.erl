@@ -12,4 +12,5 @@ spawn_n(N) ->
 test_client(N, S) ->
     KEY = string:copies("A", N),
     put(S, KEY, "123"),
-    test_client(N, S).
+    get(S, KEY).
+    %test_client(N,S).

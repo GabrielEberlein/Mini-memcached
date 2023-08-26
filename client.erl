@@ -1,6 +1,6 @@
 -module(client).
 -export([start/1, put/3, get/2, del/2, stats/1]).
--export([parse_to_binary/1, handle_receive/2]).
+-export([parse_to_binary/1, handle_receive/3]).
 
 % Macros para las distintas instrucciones
 -define(PUT, <<11>>).
@@ -52,7 +52,7 @@ parse_response(Socket, Task) ->
 % En el caso de haber devuelto un OK, parsea los argumentos retornados
 % En el caso de haber devuelto un Error, especifica el mismo
 % Comprueba si ocurre un error de conección al intentar recibir los mismos
-handle_receive(Socket, Task) ->
+handle_receive(Socket, ParsedKey, Task) ->
     case gen_tcp:recv(Socket, 1) of
         {ok, Data} ->
             case Data of
@@ -61,7 +61,8 @@ handle_receive(Socket, Task) ->
                 ?ENOTFOUND -> enotfound;
                 ?EBINARY -> ebinary;
                 ?EBIG -> ebig;
-                ?EUNK -> eunk
+                ?EUNK -> eunk;
+                _ -> io:format("Huevon ~p ~n", [byte_size(ParsedKey)])
             end;
         {error, Type} -> Type
     end.
@@ -72,23 +73,23 @@ put(Socket, Key, Value) ->
     ParsedKey = parse_to_binary(Key),
     ParsedValue = parse_to_binary(Value),
     gen_tcp:send(Socket, <<?PUT/binary, ParsedKey/binary, ParsedValue/binary>>),
-    handle_receive(Socket, put).
+    handle_receive(Socket, ParsedKey, put).
 
 % Ejecuta la instrucción Get al socket especificado con los argumentos dados
 % y obtiene el resultado de la misma
 get(Socket, Key) ->
     ParsedKey = parse_to_binary(Key),
     gen_tcp:send(Socket, <<?GET/binary, ParsedKey/binary>>),
-    handle_receive(Socket, get).
+    handle_receive(Socket, ParsedKey, get).
 
 % Ejecuta la instrucción Del al socket especificado con los argumentos dados
 % y obtiene el resultado de la misma
 del(Socket, Key) ->
     ParsedKey = parse_to_binary(Key),
     gen_tcp:send(Socket, <<?DEL/binary, ParsedKey/binary>>),
-    handle_receive(Socket, del).
+    handle_receive(Socket, ParsedKey, del).
 
 % Ejecuta la instrucción Stats al socket especificado y obtiene el resultado de la misma
 stats(Socket) ->
     gen_tcp:send(Socket, ?STATS),
-    handle_receive(Socket, stats).
+    handle_receive(Socket, 1, stats).
