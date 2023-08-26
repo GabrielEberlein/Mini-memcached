@@ -50,12 +50,14 @@ struct ThreadArgs{
 
 void bin_handle(int fd, char* args[3], int lens[3]){
 	char cmd = args[0][0];
+	log(1, "bin_handle args:%d", args[0][0]);
+	log(1, "cmd: %d", cmd);
 	switch (cmd) {
 		case PUT: {
-			log(1, "PUTeando");
 			stats_inc(table->stats, PUT_STAT);
 			hashtable_insert(args[1], lens[1], args[2], lens[2], 1);
 			char k = OK;
+			log(1, "PUT %c", k);
 			write(fd, &k, 1);
 			break;
 		}
@@ -78,6 +80,7 @@ void bin_handle(int fd, char* args[3], int lens[3]){
 			break;
 		}
 		case DEL:{
+			log(1, "DEL");
 			stats_inc(table->stats, DEL_STAT);
 			int res = hashtable_delete(args[1], lens[1]);
 			if(res != -1){
@@ -91,6 +94,7 @@ void bin_handle(int fd, char* args[3], int lens[3]){
 			break;
 		}
 		case STATS:	{
+			log(1, "STATS");
 			char reply = OK, buffer[128];
 			write(fd, &reply, 1);
 			int len = sprintf(buffer, "PUTS=%lu GETS=%lu DELS=%lu KEYS=%lu", table->stats->amounts[0], table->stats->amounts[1], table->stats->amounts[2], table->stats->amounts[3]);
@@ -100,7 +104,8 @@ void bin_handle(int fd, char* args[3], int lens[3]){
 			break;
 		}
 		default: {
-			char reply = EINVAL;
+			log(1, "DEFAULT");
+			char reply = EINVALID;
 			write(fd, &reply, 1);
 			break;
 		}
@@ -114,15 +119,20 @@ int bin_consume(char** buf, int fd, int* blen) {
 	if ((*blen) == 0) (*blen) += READ(fd, buf, blen, 1);
 	args[0] = (*buf);
 
+	log(1, "buf: %d", buf[0][0]);
 	switch (buf[0][0]) {
 		case PUT: {
+			log(1, "before args: %d", args[0][0]);
 			READ_BINARG(fd, buf, blen, 1, args[1], lens[1]);
 			READ_BINARG(fd, buf, blen, 1 + 4 + lens[1], args[2], lens[2]);
+			log(1, "after args: %d", args[0][0]);
 			bin_handle(fd,args,lens);
 			break;
 		}
 		case GET: {
+			log(1, "before args: %d", args[0][0]);
 			READ_BINARG(fd, buf, blen, 1, args[1], lens[1]);
+			log(1, "after args: %d", args[0][0]);
 			bin_handle(fd, args, lens);
 			break;
 		}
@@ -152,7 +162,7 @@ void text_handle(int fd, char *args[3], int lens[3], int nargs){
 	
     if(strcmp(cmd,"PUT") == 0) {
 		if(nargs != 3) {
-			write(fd, "EINVAL\n", 7);
+			write(fd, "EINVALID\n", 9);
 			return;
 		}
 		stats_inc(table->stats, PUT_STAT);
@@ -164,7 +174,7 @@ void text_handle(int fd, char *args[3], int lens[3], int nargs){
     } 
 	else if(strcmp(cmd,"GET") == 0) {
 		if(nargs != 2) {
-			write(fd, "EINVAL\n", 7);
+			write(fd, "EINVALID\n", 9);
 			return;
 		}
 		stats_inc(table->stats, GET_STAT);
@@ -188,7 +198,7 @@ void text_handle(int fd, char *args[3], int lens[3], int nargs){
 	} 
 	else if(strcmp(cmd,"DEL") == 0) {
 		if(nargs != 2) {
-			write(fd, "EINVAL\n", 7);
+			write(fd, "EINVALID\n", 9);
 			return;
 		}
 		stats_inc(table->stats, DEL_STAT);
@@ -202,9 +212,9 @@ void text_handle(int fd, char *args[3], int lens[3], int nargs){
     } 
 	else if(strcmp(cmd,"STATS") == 0) {
 		if(nargs != 1) {
-			char reply[8];
-        	sprintf(reply, "EINVAL\n");
-			write(fd, reply, 8);
+			char reply[10];
+        	sprintf(reply, "EINVALID\n");
+			write(fd, reply, 10);
 			return;
 		}
 		char reply[2024];
@@ -212,9 +222,9 @@ void text_handle(int fd, char *args[3], int lens[3], int nargs){
 		write(fd, reply, len);
     } 
 	else {
-		char reply[8];
-		sprintf(reply, "EINVAL\n");
-		write(fd, reply, 8);
+		char reply[10];
+		sprintf(reply, "EINVALID\n");
+		write(fd, reply, 10);
 	}
 
 	//Para printear la cola, sacarlo a la chucha cuando terminemos
@@ -240,7 +250,7 @@ int text_consume(char** buf, int fd, int* blen) {
 		assert (rem >= 0);
 		/* Buffer lleno, no hay comandos, matar */
 		if (rem == 0) {
-			write(fd, "EINVAL\n", 7);
+			write(fd, "EINVALID\n", 7);
 			return -1;
 		}
 		int nread = READ(fd, buf, blen, rem);	
@@ -330,7 +340,8 @@ void *thread(void *args) {
 				else{
 					if((data->buf) != NULL) {
 						free(data->buf);												
-						data->buf = NULL; }		
+						data->buf = NULL;
+					}		
 					data->blen = 0;									
 					close(data->fd); 									
 				}

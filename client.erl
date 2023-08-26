@@ -30,8 +30,8 @@ parse_to_binary(X) ->
 % Comprueba si ocurre un error de conección al intentar recibir los mismos
 parse_response(Socket, Task) ->
     case Task of
-        put -> ok;
-        del -> ok;
+        put -> io:format("~p -> OK~n", [Task]);
+        del -> io:format("~p -> OK~n", [Task]);
         _ ->
             case gen_tcp:recv(Socket, 4) of
                 {ok, Data} -> 
@@ -39,7 +39,7 @@ parse_response(Socket, Task) ->
                     case gen_tcp:recv(Socket, Length) of
                         {ok, Data2} -> 
                             case Task of
-                                get -> {ok, binary_to_term(Data2)};
+                                get -> io:format("~p -> OK ~p~n", [Task, binary_to_term(Data2)]);
                                 stats -> {ok, binary_to_list(Data2)}
                             end;
                         {error, Type2} -> Type2
@@ -57,12 +57,12 @@ handle_receive(Socket, ParsedKey, Task) ->
         {ok, Data} ->
             case Data of
                 ?OK -> parse_response(Socket, Task);
-                ?EINVAL -> einval;
+                ?EINVAL -> io:format("EINVAL Task:~p Len:~p ~n", [Task, byte_size(ParsedKey)]);
                 ?ENOTFOUND -> enotfound;
                 ?EBINARY -> ebinary;
                 ?EBIG -> ebig;
                 ?EUNK -> eunk;
-                _ -> io:format("Huevon ~p ~n", [byte_size(ParsedKey)])
+                Data -> io:format("Data:~p Task:~p Len:~p ~n", [Data, Task, byte_size(ParsedKey)])
             end;
         {error, Type} -> Type
     end.

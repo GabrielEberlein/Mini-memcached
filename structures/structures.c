@@ -182,7 +182,7 @@ Node bst_replace(Node node) {
     }
     if(prev){
       prev->right = replacement->left;
-      replacement->left = node->left;
+  replacement->left = node->left;
     }
     replacement->right = node->right;
   } else {
