@@ -28,10 +28,10 @@ parse_to_binary(X) ->
 
 % Parsea los argumentos de la respuesta segun la especificación en binario dada por el enunciado
 % Comprueba si ocurre un error de conección al intentar recibir los mismos
-parse_response(Socket, Task) ->
+parse_response(Socket, ParsedKey, Task) ->
     case Task of
-        put -> io:format("~p -> OK~n", [Task]);
-        del -> io:format("~p -> OK~n", [Task]);
+        put -> io:format("~p -> OK Len:~p~n", [Task, byte_size(ParsedKey)]);
+        del -> io:format("~p -> OK Len:~p~n", [Task, byte_size(ParsedKey)]);
         _ ->
             case gen_tcp:recv(Socket, 4) of
                 {ok, Data} -> 
@@ -39,7 +39,7 @@ parse_response(Socket, Task) ->
                     case gen_tcp:recv(Socket, Length) of
                         {ok, Data2} -> 
                             case Task of
-                                get -> io:format("~p -> OK ~p~n", [Task, binary_to_term(Data2)]);
+                                get -> io:format("~p -> OK ~p Len:~p~n", [Task, binary_to_term(Data2), byte_size(ParsedKey)]);
                                 stats -> {ok, binary_to_list(Data2)}
                             end;
                         {error, Type2} -> Type2
@@ -56,12 +56,12 @@ handle_receive(Socket, ParsedKey, Task) ->
     case gen_tcp:recv(Socket, 1) of
         {ok, Data} ->
             case Data of
-                ?OK -> parse_response(Socket, Task);
+                ?OK -> parse_response(Socket, ParsedKey, Task);
                 ?EINVAL -> io:format("EINVAL Task:~p Len:~p ~n", [Task, byte_size(ParsedKey)]);
-                ?ENOTFOUND -> enotfound;
-                ?EBINARY -> ebinary;
-                ?EBIG -> ebig;
-                ?EUNK -> eunk;
+                ?ENOTFOUND -> io:format("ENOTFOUND Task:~p Len:~p ~n", [Task, byte_size(ParsedKey)]);
+                ?EBINARY -> io:format("EBINARY Task:~p Len:~p ~n", [Task, byte_size(ParsedKey)]);
+                ?EBIG -> io:format("EBIG Task:~p Len:~p ~n", [Task, byte_size(ParsedKey)]);
+                ?EUNK -> io:format("EUNK Task:~p Len:~p ~n", [Task, byte_size(ParsedKey)]);
                 Data -> io:format("Data:~p Task:~p Len:~p ~n", [Data, Task, byte_size(ParsedKey)])
             end;
         {error, Type} -> Type

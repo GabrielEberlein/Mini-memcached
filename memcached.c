@@ -18,7 +18,7 @@
 #include "commons/epoll.h"
 
 #define MAX_EVENTS 10
-#define MAX_THREADS 5
+#define MAX_THREADS 2
 
 struct epoll_event events[MAX_EVENTS];
 
@@ -49,14 +49,14 @@ struct ThreadArgs{
 
 void bin_handle(int fd, char* args[3], int lens[3]){
 	char cmd = args[0][0];
-	log(1, "bin_handle args:%d", args[0][0]);
-	log(1, "cmd: %d", cmd);
+	//log(1, "bin_handle args:%d", args[0][0]);
+	//log(1, "cmd: %d", cmd);
 	switch (cmd) {
 		case PUT: {
 			stats_inc(table->stats, PUT_STAT);
 			hashtable_insert(args[1], lens[1], args[2], lens[2], 1);
 			char k = OK;
-			log(1, "PUT %c", k);
+			//log(1, "PUT %c", k);
 			write(fd, &k, 1);
 			break;
 		}
@@ -65,7 +65,7 @@ void bin_handle(int fd, char* args[3], int lens[3]){
 			Node node = hashtable_search(args[1], lens[1]);
 			if(node != NULL) {
 				String val = node->val;
-				log(1,"Gettie: %s, %d", val->data, val->len);
+				//log(1,"Gettie: %s, %d", val->data, val->len);
 				char k = OK;
 				write(fd, &k, 1);
 				int len_net = htonl(val->len);
@@ -73,13 +73,13 @@ void bin_handle(int fd, char* args[3], int lens[3]){
 				write(fd, val->data, val->len);
 			} else {
 				char enf = ENOTFOUND;
-				log(1,"NOTFOUND :(");
+				//log(1,"NOTFOUND :(");
 				write(fd, &enf, 1);
 			}
 			break;
 		}
 		case DEL:{
-			log(1, "DEL");
+			//log(1, "DEL");
 			stats_inc(table->stats, DEL_STAT);
 			int res = hashtable_delete(args[1], lens[1]);
 			if(res != -1){
@@ -93,7 +93,7 @@ void bin_handle(int fd, char* args[3], int lens[3]){
 			break;
 		}
 		case STATS:	{
-			log(1, "STATS");
+			//log(1, "STATS");
 			char reply = OK, buffer[128];
 			write(fd, &reply, 1);
 			int len = sprintf(buffer, "PUTS=%lu GETS=%lu DELS=%lu KEYS=%lu", table->stats->amounts[0], table->stats->amounts[1], table->stats->amounts[2], table->stats->amounts[3]);
@@ -103,7 +103,7 @@ void bin_handle(int fd, char* args[3], int lens[3]){
 			break;
 		}
 		default: {
-			log(1, "DEFAULT");
+			//log(1, "bin_handle DEFAULT");
 			char reply = EINVALID;
 			write(fd, &reply, 1);
 			break;
@@ -112,7 +112,9 @@ void bin_handle(int fd, char* args[3], int lens[3]){
 }
 
 int bin_consume(char** buf, int fd, int* blen) {
+	log(1, "port: %d", fd);
 	if(*buf==NULL) *buf = safe_malloc(1);
+	if(*buf==NULL) log(1, "SUS");
 	char *args[3]= {NULL};
 	int lens[3] = {0};
 	if ((*blen) == 0) (*blen) += READ(fd, *buf, *blen, 1);
@@ -148,6 +150,10 @@ int bin_consume(char** buf, int fd, int* blen) {
 			break;
 		}
 		default: {
+			//if(buf[0][0] == GET) log(1, "Me confundi");
+			//log(1, "bin_consume DEFAULT");
+			char reply = EINVALID;
+			write(fd, &reply, 1);
 			break;
 		}
 	}
@@ -156,6 +162,7 @@ int bin_consume(char** buf, int fd, int* blen) {
 		*buf = NULL;
 	}
 	*blen = 0;
+	//log(1, "Se completo la task port:%d", fd);
 	return 0;
 }
 
@@ -168,7 +175,7 @@ void text_handle(int fd, char *args[3], int lens[3], int nargs){
 			return;
 		}
 		stats_inc(table->stats, PUT_STAT);
-		log(1, "Inserto, Data: %s, Largo: %d, Data: %s, Largo: %d", args[1], lens[1], args[2], lens[2]);
+		//log(1, "Inserto, Data: %s, Largo: %d, Data: %s, Largo: %d", args[1], lens[1], args[2], lens[2]);
         hashtable_insert(args[1], lens[1], args[2], lens[2], 0);
 		char reply[2024];
         sprintf(reply, "OK\n");
@@ -180,7 +187,7 @@ void text_handle(int fd, char *args[3], int lens[3], int nargs){
 			return;
 		}
 		stats_inc(table->stats, GET_STAT);
-		log(1, "Busco, Data: %s, Largo: %d", args[1], lens[1]);
+		//log(1, "Busco, Data: %s, Largo: %d", args[1], lens[1]);
         Node node = hashtable_search(args[1], lens[1]);
 		if(node != NULL){
 			if(node->binary == 1) {
@@ -305,7 +312,7 @@ void limit_mem(size_t limit)
 }
 
 void handle_signals(int s) {
-	log(1, "SIGPIPE ERROR");
+	log(-3, "SIGPIPE ERROR");
 }
 
 void *thread(void *args) {
@@ -331,12 +338,12 @@ void *thread(void *args) {
 				csock = new_client(data->fd);
 				log(1, "Nuevo Cliente id:%d\n", csock);
 				epoll_add(efd, csock, data->mode, EPOLLIN | EPOLLET | EPOLLONESHOT);
-				epoll_mod(efd, data->fd, data->mode, data, EPOLLIN | EPOLLONESHOT);
+				epoll_mod(efd, data->fd, data->mode, data, EPOLLIN | EPOLLET | EPOLLONESHOT);
 			} else {
 				int r;
 				if(data->mode == TEXT) r = text_consume(&(data->buf), data->fd, &(data->blen));
 				if(data->mode == BIN) r = bin_consume(&(data->buf), data->fd, &(data->blen));
-				log(1, "r:%d", r);
+				//log(1, "r:%d", r);
 				if(r != -1) epoll_mod(efd, data->fd, data->mode, data, EPOLLIN | EPOLLET | EPOLLONESHOT);
 				else{
 					if((data->buf) != NULL) {
@@ -344,7 +351,8 @@ void *thread(void *args) {
 						data->buf = NULL;
 					}		
 					data->blen = 0;									
-					close(data->fd); 									
+					close(data->fd);
+					//log(1,"No hay nada mas port:%d", data->fd); 									
 				}
 			}
 		}
@@ -385,7 +393,7 @@ int main(int argc, char **argv)
 
 	__loglevel = 2;
 	//Magic number: 11400000 5 puts
-	limit_mem(1111400000);
+	limit_mem(111400000);
 	signal(SIGPIPE, handle_signals);
 	hashtable_create(1);
 	queue_create();

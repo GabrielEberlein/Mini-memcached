@@ -14,15 +14,23 @@ Queue queue = NULL;
 
 void* safe_malloc(size_t size){
   void* ptr=NULL;
+  int i;
   while((ptr=malloc(size)) == NULL && queue->first != NULL) {
-    hashtable_delete(queue->first->key->data, queue->first->key->len);
+    pthread_mutex_lock(&table->locks[table->hash(queue->first->key->data, queue->first->key->len) % table->capacity / table->range]);
+    int region = (table->hash(queue->first->key->data, queue->first->key->len) % table->capacity) / table->range;
+    i = bst_delete(&(table->elems[table->hash(queue->first->key->data, queue->first->key->len) % table->capacity]), table->stats, queue->first->key->data, queue->first->key->len);
+    pthread_mutex_unlock(&table->locks[region]);
   }
   return ptr;
 }
 
 void* safe_realloc(void* ptr, size_t size){
+  int i;
   while((ptr=realloc(ptr, size)) == NULL && queue->first != NULL){
-    hashtable_delete(queue->first->key->data, queue->first->key->len);
+    pthread_mutex_lock(&table->locks[table->hash(queue->first->key->data, queue->first->key->len) % table->capacity / table->range]);
+    int region = (table->hash(queue->first->key->data, queue->first->key->len) % table->capacity) / table->range;
+    i = bst_delete(&(table->elems[table->hash(queue->first->key->data, queue->first->key->len) % table->capacity]), table->stats, queue->first->key->data, queue->first->key->len);
+    pthread_mutex_unlock(&table->locks[region]);
   }
   return ptr;
 }
@@ -95,10 +103,14 @@ void node_destroy(Node node){
 /----------------------------------------------*/
 
 void queue_create() {
-    queue = malloc(sizeof(struct _Queue));
-    queue->first = NULL;
-    queue->last = NULL;
-    pthread_mutex_init(&(queue->lock), NULL);
+  queue = malloc(sizeof(struct _Queue));
+  queue->first = NULL;
+  queue->last = NULL;
+  pthread_mutexattr_t attr;
+  pthread_mutexattr_init(&attr);
+  pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+  pthread_mutex_init(&queue->lock, &attr);
+  pthread_mutexattr_destroy(&attr);
 }
 
 void queue_destroy() {
@@ -292,7 +304,11 @@ void hashtable_create(unsigned capacity) {
   table->hash = (HashFunction)hash_word;
 
   for (unsigned idx = 0; idx < NUM_REGIONS; ++idx) {
-    pthread_mutex_init(table->locks+idx, NULL);
+    pthread_mutexattr_t attr;
+    pthread_mutexattr_init(&attr);
+    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+    pthread_mutex_init(table->locks+idx, &attr);
+    pthread_mutexattr_destroy(&attr);
   }
 }
 
@@ -316,21 +332,18 @@ unsigned hash_word(char* data, int len) {
 }
 
 void hashtable_insert(char* key, int keyLen, char* val, int valLen, int bin) {
-  Node newNode = hashtable_search(key, keyLen);
-
-  int i;
+  unsigned idx = table->hash(key, keyLen) % table->capacity;
+  int region = idx / table->range;
+  pthread_mutex_lock(table->locks+region);
+  Node newNode = bst_search(table->elems[idx], key, keyLen);
   if(newNode == NULL) {
     while((newNode = node_create(key, keyLen, val, valLen, bin))==NULL && queue->first != NULL){
       pthread_mutex_lock(&table->locks[table->hash(queue->first->key->data, queue->first->key->len) % table->capacity / table->range]);
       int region = (table->hash(queue->first->key->data, queue->first->key->len) % table->capacity) / table->range;
-      i = bst_delete(&(table->elems[table->hash(queue->first->key->data, queue->first->key->len) % table->capacity]), table->stats, queue->first->key->data, queue->first->key->len);
+      bst_delete(&(table->elems[table->hash(queue->first->key->data, queue->first->key->len) % table->capacity]), table->stats, queue->first->key->data, queue->first->key->len);
       pthread_mutex_unlock(&table->locks[region]);
     }
-    unsigned idx = table->hash(key, keyLen) % table->capacity;
-    int region = idx / table->range;
-    pthread_mutex_lock(&table->locks[region]);
     table->elems[idx] = bst_insert(table->elems[idx], newNode, table->stats);
-    pthread_mutex_unlock(&table->locks[region]);
   } else {
     newNode->binary = bin;
     string_destroy(newNode->val);
@@ -338,11 +351,12 @@ void hashtable_insert(char* key, int keyLen, char* val, int valLen, int bin) {
     while((newValue = string_create(val, valLen))==NULL && queue->first != NULL){
       pthread_mutex_lock(&table->locks[table->hash(queue->first->key->data, queue->first->key->len) % table->capacity / table->range]);
       int region = (table->hash(queue->first->key->data, queue->first->key->len) % table->capacity) / table->range;
-      i = bst_delete(&(table->elems[table->hash(queue->first->key->data, queue->first->key->len) % table->capacity]), table->stats, queue->first->key->data, queue->first->key->len);
+      bst_delete(&(table->elems[table->hash(queue->first->key->data, queue->first->key->len) % table->capacity]), table->stats, queue->first->key->data, queue->first->key->len);
       pthread_mutex_unlock(&table->locks[region]);
     }
     newNode->val = newValue;
   }
+  pthread_mutex_unlock(table->locks+region);  
 }
 
 int hashtable_delete(char* key, int keyLen) {
@@ -355,7 +369,7 @@ int hashtable_delete(char* key, int keyLen) {
 }
 
 Node hashtable_search(char* key, int keyLen) {
-  log(1, "hashtable_search key:%s keyLen:%d", key, keyLen);
+  //log(1, "hashtable_search key:%s keyLen:%d", key, keyLen);
   unsigned idx = table->hash(key, keyLen) % table->capacity;
   int region = idx / table->range;
   pthread_mutex_lock(table->locks+region);
