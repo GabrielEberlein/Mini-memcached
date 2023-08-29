@@ -136,6 +136,8 @@ void queue_delete(Node node);
 */
 void queue_relocate(Node node);
 
+void queue_pop();
+
 /*--------------------------------------------/
 /               BST FUNCTIONS                 /
 /--------------------------------------------*/
@@ -145,14 +147,14 @@ void queue_relocate(Node node);
     Inserta un nuevo nodo en el BST o actualiza el valor si el mismo ya existe
     y reposicionandolo al frente de la cola
 */
-Node bst_insert(Node root, Node newNode, Stats stats);
+Node bst_insert(Node root, char* key, int keyLen, char* val, int valLen, int bin);
 
 // delete_bst -> Queue, Node*, String -> int
 /*
     Busca y borra un nodo de un BST
     Devuelve 0 si el mismo fue encontrado, (-1) en caso contrario
 */
-int bst_delete(Node* node, Stats stats, char* key, int keyLen);
+int bst_delete(Node* node, char* key, int keyLen);
 
 // search_bst : Queue, Node, String -> String
 /*

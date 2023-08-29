@@ -18,9 +18,7 @@
 #include "commons/epoll.h"
 
 #define MAX_EVENTS 10
-#define MAX_THREADS 2
-
-struct epoll_event events[MAX_EVENTS];
+#define MAX_THREADS 5
 
 struct ThreadArgs{
 	int text_sock;
@@ -30,22 +28,27 @@ struct ThreadArgs{
 
 /* Macro interna */
 #define READ(fd, buf, blen, n) ({							\
+	int pblen = blen; 										\
+	int pn = n;												\
+	void* pbuf = buf;\
 	int rc = read(fd, buf + blen, n);						\
+	if(blen==0 && n!=1) log(1, "BEFORE blen: %d, port: %d, buf: %p",pblen,fd,buf);\
+	if(blen==0 && n!=1) log(1, "AFTER blen: %d, port: %d, buf: %p",blen,fd,buf);  \
 	if (rc < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))\
 		return 0;											\
 	if (rc <= 0)											\
 		return -1;											\
 	rc; }) 													\
 
-#define READ_BINARG(fd, buf, blen, off, len) ({ 												\
+#define READ_BINARG(fd, buf, blen, off, len) ({ 											\
 	if(blen==off) buf = safe_realloc(buf, off + 4);											\
 	if (blen < off + 4) blen += READ(fd, buf, blen, off + 4 - blen);						\
-	int len_net;																					\
-	memcpy(&len_net, buf + off, 4);																\
-	len = ntohl(len_net);																			\
+	int len_net;																			\
+	memcpy(&len_net, buf + off, 4);															\
+	len = ntohl(len_net);																	\
 	if(blen==off + 4) buf = safe_realloc(buf, off + 4 + len);								\
 	if (blen < off + 4 + len) blen += READ(fd, buf, blen, off + 4 + len - blen);			\
-})																									\
+})																							\
 
 void bin_handle(int fd, char* args[3], int lens[3]){
 	char cmd = args[0][0];
@@ -56,7 +59,7 @@ void bin_handle(int fd, char* args[3], int lens[3]){
 			stats_inc(table->stats, PUT_STAT);
 			hashtable_insert(args[1], lens[1], args[2], lens[2], 1);
 			char k = OK;
-			//log(1, "PUT %c", k);
+			log(1, "PUT %c", k);
 			write(fd, &k, 1);
 			break;
 		}
@@ -65,7 +68,7 @@ void bin_handle(int fd, char* args[3], int lens[3]){
 			Node node = hashtable_search(args[1], lens[1]);
 			if(node != NULL) {
 				String val = node->val;
-				//log(1,"Gettie: %s, %d", val->data, val->len);
+				log(1,"Gettie: %s, %d", val->data, val->len);
 				char k = OK;
 				write(fd, &k, 1);
 				int len_net = htonl(val->len);
@@ -73,13 +76,13 @@ void bin_handle(int fd, char* args[3], int lens[3]){
 				write(fd, val->data, val->len);
 			} else {
 				char enf = ENOTFOUND;
-				//log(1,"NOTFOUND :(");
+				log(1,"NOTFOUND :(");
 				write(fd, &enf, 1);
 			}
 			break;
 		}
 		case DEL:{
-			//log(1, "DEL");
+			log(1, "DEL");
 			stats_inc(table->stats, DEL_STAT);
 			int res = hashtable_delete(args[1], lens[1]);
 			if(res != -1){
@@ -93,7 +96,7 @@ void bin_handle(int fd, char* args[3], int lens[3]){
 			break;
 		}
 		case STATS:	{
-			//log(1, "STATS");
+			log(1, "STATS");
 			char reply = OK, buffer[128];
 			write(fd, &reply, 1);
 			int len = sprintf(buffer, "PUTS=%lu GETS=%lu DELS=%lu KEYS=%lu", table->stats->amounts[0], table->stats->amounts[1], table->stats->amounts[2], table->stats->amounts[3]);
@@ -112,15 +115,15 @@ void bin_handle(int fd, char* args[3], int lens[3]){
 }
 
 int bin_consume(char** buf, int fd, int* blen) {
-	log(1, "port: %d", fd);
 	if(*buf==NULL) *buf = safe_malloc(1);
-	if(*buf==NULL) log(1, "SUS");
 	char *args[3]= {NULL};
 	int lens[3] = {0};
 	if ((*blen) == 0) (*blen) += READ(fd, *buf, *blen, 1);
 
-	log(1, "buf: %d", buf[0][0]);
-	switch (buf[0][0]) {
+	// log(1, "blen: %d, port: %d",*blen, fd);
+	// log(1, "buf: %d, port: %d", buf[0][0], fd);
+	char cmd = buf[0][0];
+	switch (cmd) {
 		case PUT: {
 			READ_BINARG(fd, *buf, *blen, 1, lens[1]);
 			READ_BINARG(fd, *buf, *blen, 1 + 4 + lens[1], lens[2]);
@@ -262,7 +265,7 @@ int text_consume(char** buf, int fd, int* blen) {
 			write(fd, "EINVALID\n", 7);
 			return -1;
 		}
-		(*blen) += READ(fd, buf, *blen, rem);	
+		(*blen) += READ(fd, *buf, *blen, rem);	
 		char *p, *p0 = (*buf);
 		int nlen = (*blen);
 
@@ -318,9 +321,9 @@ void handle_signals(int s) {
 void *thread(void *args) {
 	
 	int nfds, csock;
+	struct epoll_event events[MAX_EVENTS];
 
 	struct ThreadArgs* thread_args = (struct ThreadArgs*)args;
-
     int text_sock = thread_args->text_sock;
 	int bin_sock = thread_args->bin_sock;
     int efd = thread_args->efd;
@@ -333,7 +336,6 @@ void *thread(void *args) {
 		}
 		for(int i = 0; i < nfds; i++) {
 			Data* data = events[i].data.ptr;
-			
 			if(data->fd == text_sock || data->fd == bin_sock) {
 				csock = new_client(data->fd);
 				log(1, "Nuevo Cliente id:%d\n", csock);
@@ -343,15 +345,17 @@ void *thread(void *args) {
 				int r;
 				if(data->mode == TEXT) r = text_consume(&(data->buf), data->fd, &(data->blen));
 				if(data->mode == BIN) r = bin_consume(&(data->buf), data->fd, &(data->blen));
-				//log(1, "r:%d", r);
-				if(r != -1) epoll_mod(efd, data->fd, data->mode, data, EPOLLIN | EPOLLET | EPOLLONESHOT);
+				
+				if(r == 0) epoll_mod(efd, data->fd, data->mode, data, EPOLLIN | EPOLLET | EPOLLONESHOT);
 				else{
 					if((data->buf) != NULL) {
 						free(data->buf);												
 						data->buf = NULL;
 					}		
-					data->blen = 0;									
+					data->blen = 0;		
+					epoll_ctl(efd, EPOLL_CTL_DEL, data->fd, NULL);							
 					close(data->fd);
+					free(data);
 					//log(1,"No hay nada mas port:%d", data->fd); 									
 				}
 			}
@@ -362,8 +366,8 @@ void *thread(void *args) {
 void server(int text_sock, int bin_sock) {
 	int efd = epoll_init();
 
-	epoll_add(efd, text_sock, TEXT, EPOLLIN | EPOLLONESHOT);
-	epoll_add(efd, bin_sock, BIN, EPOLLIN | EPOLLONESHOT);
+	epoll_add(efd, text_sock, TEXT, EPOLLIN | EPOLLET | EPOLLONESHOT);
+	epoll_add(efd, bin_sock, BIN, EPOLLIN | EPOLLET | EPOLLONESHOT);
 
 	struct ThreadArgs *args = (struct ThreadArgs*)safe_malloc(sizeof(struct ThreadArgs));
 	args->text_sock = text_sock;
@@ -384,7 +388,6 @@ void server(int text_sock, int bin_sock) {
             exit(EXIT_FAILURE);
         }
     }
-
 }
 
 int main(int argc, char **argv)
@@ -393,7 +396,7 @@ int main(int argc, char **argv)
 
 	__loglevel = 2;
 	//Magic number: 11400000 5 puts
-	limit_mem(111400000);
+	limit_mem(511400000);
 	signal(SIGPIPE, handle_signals);
 	hashtable_create(1);
 	queue_create();
