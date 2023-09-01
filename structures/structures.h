@@ -136,7 +136,7 @@ void queue_delete(Node node);
 */
 void queue_relocate(Node node);
 
-void queue_pop();
+int queue_pop();
 
 /*--------------------------------------------/
 /               BST FUNCTIONS                 /
@@ -147,7 +147,7 @@ void queue_pop();
     Inserta un nuevo nodo en el BST o actualiza el valor si el mismo ya existe
     y reposicionandolo al frente de la cola
 */
-Node bst_insert(Node root, char* key, int keyLen, char* val, int valLen, int bin);
+void bst_insert(Node* root, char* key, int keyLen, char* val, int valLen, int bin);
 
 // delete_bst -> Queue, Node*, String -> int
 /*
@@ -162,7 +162,7 @@ int bst_delete(Node* node, char* key, int keyLen);
     Si lo encuentra, devuelve el valor y reposiciona el nodo al frente de la cola
     Si no lo encuentra, devuelve NULL
 */
-Node bst_search(Node node, char* key, int keyLen);
+String bst_search(Node node, char* key, int keyLen, int* bin);
 
 // free_bst : Node -> NULL
 /*
@@ -220,7 +220,7 @@ void hashtable_insert(char* key, int keyLen, char* val, int valLen, int bin);
 /*
   Busca un valor en la Tabla Hash por su Key, retorna el mismo
 */
-Node hashtable_search(char* key, int keyLen);
+String hashtable_search(char* key, int keyLen, int* bin);
 
 // hashtable_delete : Queue*, HashTable, String -> int
 /*

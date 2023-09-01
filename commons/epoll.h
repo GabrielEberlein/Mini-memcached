@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <sys/epoll.h>
 
 enum modes {TEXT, BIN};
@@ -36,3 +37,5 @@ void epoll_add(int efd, int sock, enum modes mode, int events);
     Modifica una entrada en la lista de interes de epoll 
 */
 void epoll_mod(int efd, int sock, enum modes mode, Data* data, int events);
+
+void epoll_del(int efd, Data* data);

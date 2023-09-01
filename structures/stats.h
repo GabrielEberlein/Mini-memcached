@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <sys/types.h>
 
 enum stat_enum {PUT_STAT, GET_STAT, DEL_STAT, KEYS_STAT};
 

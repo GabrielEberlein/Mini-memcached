@@ -1,5 +1,4 @@
 #include "stats.h"
-
 #include <stdlib.h>
 
 Stats stats_init() {
@@ -27,4 +26,5 @@ void stats_destroy(Stats stats) {
     for (int i = 0; i < NUM_STATS; i++) {
         pthread_mutex_destroy(stats->locks+i);
     }
+    free(stats);
 }

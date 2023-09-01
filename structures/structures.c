@@ -106,13 +106,8 @@ void queue_create() {
 }
 
 void queue_destroy() {
-    Node firstNode = queue->first;
-    Node currentNode = firstNode;
-    while (currentNode != NULL) {
-        Node nextNode = currentNode->next;
-        free(currentNode);
-        currentNode = nextNode;
-    }
+    queue->first = NULL;
+    queue->last = NULL;
     pthread_mutex_destroy(&(queue->lock));
     free(queue);
 }
@@ -157,75 +152,66 @@ void queue_relocate(Node node) {
     pthread_mutex_unlock(&(queue->lock));
 }
 
-void queue_pop() {
+int queue_pop() {
+  unsigned idx;
   pthread_mutex_lock(&(queue->lock));
   if(queue->first != NULL){
-    unsigned idx = table->hash(queue->first->key->data, queue->first->key->len) % table->capacity;
+    idx = table->hash(queue->first->key->data, queue->first->key->len) % table->capacity;
     int region = idx / table->range;
     while(pthread_mutex_trylock(table->locks+region) != 0){
       pthread_mutex_unlock(&(queue->lock));
       pthread_mutex_lock(&(queue->lock));
-      idx = table->hash(queue->first->key->data, queue->first->key->len) % table->capacity;
-      region = idx / table->range;
+      if(queue->first != NULL){
+        idx = table->hash(queue->first->key->data, queue->first->key->len) % table->capacity;
+        region = idx / table->range;
+      }else{
+        perror("No memory available");
+        exit(EXIT_FAILURE);
+      }
     }
-    bst_delete(&(queue->first), queue->first->key->data, queue->first->key->len);
+    bst_delete(table->elems+idx, queue->first->key->data, queue->first->key->len);
+    pthread_mutex_unlock(table->locks+region);
+  }else{
+    perror("No memory available");
+    exit(EXIT_FAILURE);
   }
   pthread_mutex_unlock(&(queue->lock));
+  return idx;
 }
 
 /*--------------------------------------------/
 /               BST FUNCTIONS                 /
 /--------------------------------------------*/
 
-Node bst_insert(Node root, char* key, int keyLen, char* val, int valLen, int bin) {
-  if (root == NULL){
+void bst_insert(Node* root, char* key, int keyLen, char* val, int valLen, int bin) {
+  if ((*root) == NULL){
     Node newNode;
     while((newNode = node_create(key, keyLen, val, valLen, bin))==NULL){
-      pthread_mutex_lock(&queue->lock);
-      if(queue->first != NULL){
-        unsigned idx = table->hash(queue->first->key->data, queue->first->key->len) % table->capacity;
-        int region = idx / table->range;
-        pthread_mutex_lock(table->locks+region);
-        bst_delete(table->elems+idx, queue->first->key->data, queue->first->key->len);
-        pthread_mutex_unlock(table->locks+region);
-      }else{
-        pthread_mutex_unlock(&queue->lock);
-        break;
+      int idx = queue_pop();
+      if(idx == table->hash(key, keyLen) % table->capacity){
+        bst_insert(table->elems+idx, key, keyLen, val, valLen, bin);
+        return;
       }
-      pthread_mutex_unlock(&queue->lock);
     }
     queue_push(newNode);
     stats_inc(table->stats, KEYS_STAT);
-    return newNode;
-  }
-
-  int cmp = string_compare(root->key->data, root->key->len, key, keyLen);
-  if (cmp==0) {
-    string_destroy(root->val);
-    String newVal;
-    while((newVal = string_create(val, valLen))==NULL){
-      pthread_mutex_lock(&queue->lock);
-      if(queue->first != NULL){
-        unsigned idx = table->hash(queue->first->key->data,queue->first->key->len) % table->capacity;
-        int region = idx / table->range;
-        pthread_mutex_lock(table->locks+region);
-        bst_delete(table->elems+idx, queue->first->key->data, queue->first->key->len);
-        pthread_mutex_unlock(table->locks+region);
-      }else{
-        pthread_mutex_unlock(&queue->lock);
-        break;
+    (*root) = newNode;
+  }else{
+    int cmp = string_compare((*root)->key->data, (*root)->key->len, key, keyLen);
+    if (cmp > 0 ) bst_insert(&((*root)->left), key, keyLen, val, valLen, bin);
+    if (cmp < 0 ) bst_insert(&((*root)->right), key, keyLen, val, valLen, bin);
+    if (cmp==0) {
+      string_destroy((*root)->val);
+      String newVal;
+      while((newVal = string_create(val, valLen))==NULL){
+        int idx = queue_pop();
+        if(idx == table->hash(key, keyLen) % table->capacity)
+          bst_insert(table->elems+idx,key, keyLen, val, valLen, bin);
       }
-      pthread_mutex_unlock(&queue->lock);
+      (*root)->val = newVal;
+      queue_relocate(*root);
     }
-    root->val = newVal;
-    queue_push(root);
-    stats_inc(table->stats, KEYS_STAT);
-    return root;
   }
-  if (cmp > 0 ) root->left = bst_insert(root->left, key, keyLen, val, valLen, bin);
-  if (cmp < 0 ) root->right = bst_insert(root->right, key, keyLen, val, valLen, bin);
-
-  return root;
 }
 
 Node bst_replace(Node node) {
@@ -239,7 +225,7 @@ Node bst_replace(Node node) {
     }
     if(prev){
       prev->right = replacement->left;
-  replacement->left = node->left;
+      replacement->left = node->left;
     }
     replacement->right = node->right;
   } else {
@@ -264,17 +250,25 @@ int bst_delete(Node* node, char* key, int keyLen){
   return 0;
 }
 
-Node bst_search(Node node, char* key, int keyLen){
+String bst_search(Node node, char* key, int keyLen, int* bin){
   if(node == NULL) {
     return NULL;
   }
   int cmp = string_compare(key, keyLen, node->key->data, node->key->len);
   if (cmp == 0) {
     queue_relocate(node);
-    return node;
+    String newVal;
+    while((newVal = string_create(node->val->data, node->val->len))==NULL){
+      int idx = queue_pop();
+      if(idx == table->hash(key, keyLen) % table->capacity){
+        return bst_search(table->elems[idx], key, keyLen, bin);
+      }
+    }
+    (*bin) = node->binary;
+    return newVal;
   }
-  if (cmp < 0 ) return bst_search(node->left, key, keyLen);
-  if (cmp > 0 ) return bst_search(node->right, key, keyLen);
+  if (cmp < 0 ) return bst_search(node->left, key, keyLen, bin);
+  if (cmp > 0 ) return bst_search(node->right, key, keyLen, bin);
   return NULL;
 }
 
@@ -379,7 +373,7 @@ void hashtable_insert(char* key, int keyLen, char* val, int valLen, int bin) {
   unsigned idx = table->hash(key, keyLen) % table->capacity;
   int region = idx / table->range;
   pthread_mutex_lock(table->locks+region);
-  table->elems[idx] = bst_insert(table->elems[idx], key, keyLen, val, valLen, bin);
+  bst_insert(table->elems+idx, key, keyLen, val, valLen, bin);
   pthread_mutex_unlock(table->locks+region);
 }
 
@@ -387,17 +381,17 @@ int hashtable_delete(char* key, int keyLen) {
   unsigned idx = table->hash(key, keyLen) % table->capacity;
   int region = idx / table->range;
   pthread_mutex_lock(table->locks+region);
-  int res = bst_delete(&(table->elems[idx]), key, keyLen);
+  int res = bst_delete(table->elems+idx, key, keyLen);
   pthread_mutex_unlock(table->locks+region);
   return res;
 }
 
-Node hashtable_search(char* key, int keyLen) {
+String hashtable_search(char* key, int keyLen, int* bin) {
   //log(1, "hashtable_search key:%s keyLen:%d", key, keyLen);
   unsigned idx = table->hash(key, keyLen) % table->capacity;
   int region = idx / table->range;
   pthread_mutex_lock(table->locks+region);
-  Node value = bst_search(table->elems[idx], key, keyLen);
+  String value = bst_search(table->elems[idx], key, keyLen, bin);
   pthread_mutex_unlock(table->locks+region);
   return value;
 }

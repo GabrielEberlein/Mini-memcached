@@ -37,3 +37,14 @@ void epoll_mod(int efd, int sock, enum modes mode, Data* data, int events){
 		exit(EXIT_FAILURE);
 	}
 }
+
+void epoll_del(int efd, Data* data){
+	if((data->buf) != NULL) {
+		free(data->buf);												
+		data->buf = NULL;
+	}		
+	data->blen = 0;		
+	epoll_ctl(efd, EPOLL_CTL_DEL, data->fd, NULL);							
+	close(data->fd);
+	free(data);
+}
