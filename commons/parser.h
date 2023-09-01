@@ -13,6 +13,8 @@
 //! @param[out] lens - arreglo de enteros, contiene la longitud de los tokens
 //! @param[out] ntok - cantidad de tokens
 
+ssize_t writen(int fd, const void *buffer, size_t n);
+
 int text_parser(char *buf, char *toks[3], int lens[3] );
 
 

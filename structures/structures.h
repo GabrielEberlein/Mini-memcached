@@ -136,7 +136,7 @@ void queue_delete(Node node);
 */
 void queue_relocate(Node node);
 
-int queue_pop();
+void queue_pop();
 
 /*--------------------------------------------/
 /               BST FUNCTIONS                 /
@@ -175,7 +175,7 @@ Node bst_destroy(Node node);
 /--------------------------------------------------------*/
 
 #define SEED 0
-#define NUM_REGIONS 1
+#define NUM_REGIONS 10000
 
 /** Retorna una copia fisica del dato */
 typedef int (*CompareFunction)(void *data1, void *data2);

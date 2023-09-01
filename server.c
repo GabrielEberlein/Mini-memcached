@@ -2,7 +2,7 @@
 
 int terminate_threads = 0;
 
-void bin_handle(int fd, char* args[3], int lens[3]){
+int bin_handle(int fd, char* args[3], int lens[3]){
 	char cmd = args[0][0];
 	//log(1, "bin_handle args:%d", args[0][0]);
 	//log(1, "cmd: %d", cmd);
@@ -12,7 +12,7 @@ void bin_handle(int fd, char* args[3], int lens[3]){
 			hashtable_insert(args[1], lens[1], args[2], lens[2], 1);
 			char k = OK;
 			// log(1, "PUT %s %s", args[1], args[2]);
-			write(fd, &k, 1);
+			if (writen(fd, &k, 1) == -1) return -1;
 			break;
 		}
 		case GET:{
@@ -22,14 +22,14 @@ void bin_handle(int fd, char* args[3], int lens[3]){
 			String val = hashtable_search(args[1], lens[1], &bin);
 			if(val != NULL) {
 				char k = OK;
-				write(fd, &k, 1);
+				if (writen(fd, &k, 1) == -1) return -1;
 				int len_net = htonl(val->len);
-				write(fd, &len_net, 4);
-				write(fd, val->data, val->len);
+				if (writen(fd, &len_net, 4) == -1) return -1;
+				if (writen(fd, val->data, val->len) == -1) return -1;
 				string_destroy(val);
 			} else {
 				char enf = ENOTFOUND;
-				write(fd, &enf, 1);
+				if (writen(fd, &enf, 1) == -1);
 			}
 			break;
 		}
@@ -39,31 +39,32 @@ void bin_handle(int fd, char* args[3], int lens[3]){
 			int res = hashtable_delete(args[1], lens[1]);
 			if(res != -1){
 				char k = OK;
-				write(fd, &k, 1);
+				if (writen(fd, &k, 1) == -1) return -1;
 			}
 			else{
 				char enf = ENOTFOUND;
-				write(fd, &enf, 1);
+				if (writen(fd, &enf, 1) == -1) return -1;
 			}
 			break;
 		}
 		case STATS:	{
 			// log(1, "STATS");
 			char reply = OK, buffer[128];
-			write(fd, &reply, 1);
+			if (writen(fd, &reply, 1) == -1) return -1;
 			int len = sprintf(buffer, "PUTS=%lu GETS=%lu DELS=%lu KEYS=%lu", table->stats->amounts[0], table->stats->amounts[1], table->stats->amounts[2], table->stats->amounts[3]);
 			int len_net = htonl(len);
-			write(fd, &len_net, 4);
-			write(fd, buffer, len);
+			if (writen(fd, &len_net, 4) == -1) return -1;
+			if (writen(fd, buffer, len) == -1) return -1;
 			break;
 		}
 		default: {
 			//log(1, "bin_handle DEFAULT");
 			char reply = EINVALID;
-			write(fd, &reply, 1);
+			if (writen(fd, &reply, 1) == -1) return -1;
 			break;
 		}
 	}
+	return 0;
 }
 
 int bin_consume(char** buf, int fd, int* blen) {
@@ -82,33 +83,33 @@ int bin_consume(char** buf, int fd, int* blen) {
 			args[0]=*buf;
 			args[1]=*buf+1+4;
 			args[2]=*buf+1+4+lens[1]+4;
-			bin_handle(fd,args,lens);
+			if (bin_handle(fd,args,lens) == -1) return -1;
 			break;
 		}
 		case GET: {
 			READ_BINARG(fd, *buf, *blen, 1, lens[1]);
 			args[0] = *buf;
 			args[1] = *buf+1+4;
-			bin_handle(fd, args, lens);
+			if (bin_handle(fd,args,lens) == -1) return -1;
 			break;
 		}
 		case DEL: {
 			READ_BINARG(fd, *buf, *blen, 1, lens[1]);
 			args[0] = *buf;
 			args[1] = *buf+1+4;
-			bin_handle(fd, args, lens);
+			if (bin_handle(fd,args,lens) == -1) return -1;
 			break;
 		}
 		case STATS: {
 			args[0] = *buf;
-			bin_handle(fd,args,lens);
+			if (bin_handle(fd,args,lens) == -1) return -1;
 			break;
 		}
 		default: {
 			//if(buf[0][0] == GET) log(1, "Me confundi");
 			//log(1, "bin_consume DEFAULT");
 			char reply = EINVALID;
-			write(fd, &reply, 1);
+			if (writen(fd, &reply, 1) == -1) return -1;
 			break;
 		}
 	}
@@ -121,25 +122,25 @@ int bin_consume(char** buf, int fd, int* blen) {
 	return 0;
 }
 
-void text_handle(int fd, char *args[3], int lens[3], int nargs){
+int text_handle(int fd, char *args[3], int lens[3], int nargs){
 	char *cmd = args[0];
 	
     if(strcmp(cmd,"PUT") == 0) {
 		if(nargs != 3) {
-			write(fd, "EINVALID\n", 9);
-			return;
+			if (writen(fd, "EINVALID\n", 9) == -1) return -1;
+			return 0;
 		}
 		stats_inc(table->stats, PUT_STAT);
 		//log(1, "Inserto, Data: %s, Largo: %d, Data: %s, Largo: %d", args[1], lens[1], args[2], lens[2]);
         hashtable_insert(args[1], lens[1], args[2], lens[2], 0);
 		char reply[2024];
         sprintf(reply, "OK\n");
-		write(fd, reply, 3);
+		if (writen(fd, reply, 3) == -1) return -1;
     } 
 	else if(strcmp(cmd,"GET") == 0) {
 		if(nargs != 2) {
-			write(fd, "EINVALID\n", 9);
-			return;
+			if (writen(fd, "EINVALID\n", 9) == -1) return -1;
+			return 0;
 		}
 		stats_inc(table->stats, GET_STAT);
 		//log(1, "Busco, Data: %s, Largo: %d", args[1], lens[1]);
@@ -147,24 +148,20 @@ void text_handle(int fd, char *args[3], int lens[3], int nargs){
         String val = hashtable_search(args[1], lens[1], &bin);
 		if(val != NULL){
 			if(bin == 1) {
-				write(fd, "EBINARY\n", 8);
+				if (writen(fd, "EBINARY\n", 8) == -1) return -1;
 			} else{
-				if(val->len > 2045) {
-					write(fd, "EBIG\n", 5);
-				} else {
-					write(fd, "OK ", 3);
-					write(fd, val->data, val->len);
-					write(fd,"\n",1);
-				}
+				if (writen(fd, "OK ", 3) == -1) return -1;
+				if (writen(fd, val->data, val->len) == -1) return -1;
+				if (writen(fd,"\n",1) == -1) return -1;
 			}
             string_destroy(val);
 		}
-		else write(fd, "ENOTFOUND\n", 10);
+		else if (writen(fd, "ENOTFOUND\n", 10) == -1) return -1;
 	} 
 	else if(strcmp(cmd,"DEL") == 0) {
 		if(nargs != 2) {
-			write(fd, "EINVALID\n", 9);
-			return;
+			if (writen(fd, "EINVALID\n", 9) == -1) return -1;
+			return 0;
 		}
 		stats_inc(table->stats, DEL_STAT);
         int res = hashtable_delete(args[1], lens[1]);
@@ -173,25 +170,26 @@ void text_handle(int fd, char *args[3], int lens[3], int nargs){
 			sprintf(reply, "OK\n");
 		} else
 			sprintf(reply, "ENOTFOUND\n");
-		write(fd, reply, strlen(reply));
+		if (writen(fd, reply, strlen(reply)) == -1) return -1;
     } 
 	else if(strcmp(cmd,"STATS") == 0) {
 		if(nargs != 1) {
 			char reply[10];
         	sprintf(reply, "EINVALID\n");
-			write(fd, reply, 10);
-			return;
+			if (writen(fd, reply, 10) == -1) return -1;
+			return 0;
 		}
 		char reply[2024];
 		int len = sprintf(reply, "OK PUTS=%lu GETS=%lu DELS=%lu KEYS=%lu\n", table->stats->amounts[0], table->stats->amounts[1], table->stats->amounts[2], table->stats->amounts[3]);
-		write(fd, reply, len);
+		if (writen(fd, reply, len) == -1) return -1;
     } 
 	else {
 		char reply[10];
 		sprintf(reply, "EINVALID\n");
-		write(fd, reply, 10);
+		if (writen(fd, reply, 10) == -1) return -1;
 	}
 	
+	return 0;
 }
 
 /* 0: todo ok, continua. -1 errores */
@@ -203,8 +201,15 @@ int text_consume(char** buf, int fd, int* blen) {
 		assert (rem >= 0);
 		/* Buffer lleno, no hay comandos, matar */
 		if (rem == 0) {
-			write(fd, "EINVALID\n", 7);
-			return -1;
+			if (writen(fd, "EINVALID\n", 9) == -1) return -1;
+			if((*buf) != NULL) {
+				free(*buf);											
+				*buf = NULL;
+			}
+			*blen = 0;
+			char c = 'c';
+			while(c != '\n' && c != EOF) read(fd, &c, 1);
+			return 0;
 		}
 		(*blen) += READ(fd, *buf, *blen, rem);	
 		char *p, *p0 = (*buf);
@@ -220,7 +225,7 @@ int text_consume(char** buf, int fd, int* blen) {
 			int ntok;
 			ntok = text_parser(p0, toks, lens);
 
-			text_handle(fd, toks, lens, ntok);
+			if (text_handle(fd, toks, lens, ntok) == -1) return -1;
 
 			nlen -= len + 1;
 			p0 = p;
@@ -257,7 +262,10 @@ void *thread(void *args) {
 			if(data->fd == mock_event) {
 				uint64_t dummy;
 				read(mock_event, &dummy, sizeof(uint64_t));
-				write(mock_event, &dummy, sizeof(uint64_t));
+				if (writen(mock_event, &dummy, sizeof(uint64_t)) == -1) {
+					perror("Error writing in mock");
+					exit(EXIT_FAILURE);
+				};
 			}else if(data->fd == text_sock || data->fd == bin_sock) {
 				csock = new_client(data->fd);
 				log(1, "Nuevo Cliente id:%d\n", csock);

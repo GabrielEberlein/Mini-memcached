@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <sys/eventfd.h>
 #include <signal.h>
+#include "commons/parser.h"
 #include "commons/sock.h"
 #include "server.h"
 
@@ -41,14 +42,16 @@ void handle_signals(int s) {
 		log(1, "SIGSTP");
 		terminate_threads=1;
 		uint64_t dummy=50;
-		write(mock_event, &dummy, sizeof(uint64_t));
+		int n = writen(mock_event, &dummy, sizeof(uint64_t));
+		assert(n==sizeof(uint64_t));
 		break;
 	}
 	case SIGINT:{
 		log(1, "SIGINT");
 		terminate_threads=1;
 		uint64_t dummy=50;
-		write(mock_event, &dummy, sizeof(uint64_t));
+		int n = writen(mock_event, &dummy, sizeof(uint64_t));
+		assert(n==sizeof(uint64_t));
 		break;
 	}
 	default:
@@ -63,11 +66,12 @@ int main(int argc, char **argv)
 	__loglevel = 2;
 	//Magic number: 11400000 1 thread, 5 keys
 	//Magic number: 36470000 4 threads, 1 key
+	//1G = 1073741824
 	limit_mem(1073741824);
 	signal(SIGPIPE, handle_signals);
 	signal(SIGTSTP, handle_signals);
 	signal(SIGINT, handle_signals);
-	hashtable_create(1);
+	hashtable_create(1000000);
 	queue_create();
 
 	text_sock = mk_tcp_sock(mc_lport_text);

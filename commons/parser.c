@@ -7,16 +7,25 @@
 #include <errno.h>
 #include "parser.h"
 
-
-
-/* Macro interna */
-#define READ(fd, buf, n) ({						\
-	int rc = read(fd, buf, n);					\
-	if (rc < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))	\
-		return 0;						\
-	if (rc <= 0)							\
-		return -1;						\
-	rc; })
+ssize_t writen(int fd, const void *buffer, size_t n)
+{
+	ssize_t numWritten; /* # of bytes written by last write() */
+	size_t totWritten; /* Total # of bytes written so far */
+	const char *buf;
+	buf = buffer; /* No pointer arithmetic on "void *" */
+	for (totWritten = 0; totWritten < n; ) {
+		numWritten = write(fd, buf, n - totWritten);
+		if (numWritten <= 0) {
+			if (numWritten == -1 && errno == EINTR)
+				continue; /* Interrupted --> restart write() */
+			else
+				return -1; /* Some other error */
+		}
+		totWritten += numWritten;
+		buf += numWritten;
+	}
+	return totWritten; /* Must be 'n' bytes if we get here */
+}
 
 int text_parser(char *buf, char *toks[3], int lens[3])
 {
@@ -24,7 +33,7 @@ int text_parser(char *buf, char *toks[3], int lens[3])
 //	int lens[10];
 	int ntok;
 
-	log(3, "pasrse(%s)", buf);
+	// log(3, "pasrse(%s)", buf);
 
 	/* Separar tokens */
 	{
@@ -41,7 +50,7 @@ int text_parser(char *buf, char *toks[3], int lens[3])
 		lens[ntok-1] = p - toks[ntok-1];
 	}
 
-	log(1, "checking '%s', ntok = %i", toks[0], ntok);
+	// log(1, "checking '%s', ntok = %i", toks[0], ntok);
 	return ntok;
 
 }
