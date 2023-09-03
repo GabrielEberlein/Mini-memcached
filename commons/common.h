@@ -31,8 +31,8 @@ struct eventloop_data {
 };
 
 
-static const in_port_t mc_lport_text = 8888;
-static const in_port_t mc_lport_bin  = 8889;
+static const in_port_t mc_lport_text = 888;
+static const in_port_t mc_lport_bin  = 889;
 
 static inline void quit(char *s)
 {

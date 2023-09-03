@@ -88,7 +88,7 @@ void node_destroy(Node node);
 /                QUEUE FUNCTIONS                /
 /----------------------------------------------*/
 
-#define NODES_TO_DELETE
+#define NODES_TO_DELETE 10
 
 // Estructura Cola
 /*

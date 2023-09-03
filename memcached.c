@@ -84,12 +84,6 @@ int main(int argc, char **argv)
 	signal(SIGTSTP, handle_signals);
 	signal(SIGINT, handle_signals);
 
-	// Crea la tabla Hash
-	hashtable_create(1000000);
-
-	// Crea la Cola
-	queue_create();
-
 	// Crea el socket del protocolo de texto
 	text_sock = mk_tcp_sock(mc_lport_text);
 	if (text_sock < 0)
@@ -100,10 +94,21 @@ int main(int argc, char **argv)
 	if (bin_sock < 0)
 		quit("mk_tcp_sock.bin");
 
-	// 
+	// Nos aseguramos de remover los privilegios
+	if (setuid(1000) == -1) {
+		quit("setuid");
+	}
+
+	// Creo evento mock
 	mock_event = eventfd(0,0);
 	if (mock_event < 0)
 		quit("eventfd");
+
+	// Crea la tabla Hash
+	hashtable_create(1000000);
+
+	// Crea la Cola
+	queue_create();
 
 	// Inicializa el servidor
 	server(text_sock, bin_sock, mock_event);
