@@ -38,6 +38,7 @@ typedef struct _String* String;
   - right : Node* / Raiz del subarbol derecho en los BST
   - prev : Node* / Anterior nodo en la lista cola
   - next : Node* / Posterior nodo en la lista cola
+  - bin : int / Bandera que indica si fue ingresado por el protocolo binario
 */
 struct _Node{
   String key;
@@ -52,43 +53,42 @@ typedef struct _Node* Node;
 
 // build_string : char*, int -> String
 /*
-    Crea e iniciliza un nuevo String con los valores dados
+  Crea e iniciliza un nuevo String con los valores dados
 */
 String string_create(char* data, int len);
 
 // compare_keys -> String, String -> int
 /*
-    Compara dos String, devuelve
-    - 0 si son iguales
-    - 1 si el primero es mayor
-    - (-1) si el segundo es mayor
+  Compara dos String, devuelve
+  - 0 si son iguales
+  - 1 si el primero es mayor
+  - (-1) si el segundo es mayor
 */
 int string_compare(char* d1, int l1, char* d2, int l2);
 
 // free_string : String -> NULL
 /*
-    Destruye y borra de la memoria el String
+  Destruye y borra de la memoria el String
 */
 void string_destroy(String string);
 
 // new_pair : String, Val -> Node
 /*
-    Crea e inicializa un nuevo Nodo con los valores dados
+  Crea e inicializa un nuevo Nodo con los valores dados
 */
 Node node_create(char* key, int keyLen, char* val, int valLen, int bin);
 
-// delete_node -> Queue*, Node -> Node
+// node_destroy -> Node -> NULL
 /*
-    Destruye y borra de la memoria un Nodo, tanto del BST como de la Cola
-    Retorna el arbol sin el mismo
-    Si tenia dos hijos, lo reemplaza por el mayor Nodo del subarbol izquierdo
-    Si tenia un hijo, lo reemplaza por el subarbol derecho
+  Destruye y borra de la memoria un Nodo
 */
 void node_destroy(Node node);
 
 /*----------------------------------------------/
 /                QUEUE FUNCTIONS                /
 /----------------------------------------------*/
+
+#define NODES_TO_DELETE
 
 // Estructura Cola
 /*
@@ -105,70 +105,74 @@ struct _Queue {
 };
 typedef struct _Queue* Queue;
 
-// create_queue : NULL -> Queue*
+// queue_create : NULL -> NULL
 /*
   Crea e inicializa una cola
 */
 void queue_create();
 
-// queue_destroy : Queue* -> int
+// queue_destroy : NULL -> NULL
 /*
   Destruye y borra de la memoria la cola
 */
 void queue_destroy();
 
-// push_queue : Queue*, Node -> NULL
+// queue_push : Node -> NULL
 /*
-  Agrega un elemento al unicio de la cola
+  Agrega un elemento al final de la cola
 */
 void queue_push(Node node);
 
-// queue_delete : Queue*, Node -> NULL
+// queue_delete : Node -> NULL
 /*
   Borra un elemento de la cola
 */
 void queue_delete(Node node);
 
-
-// relocate_queue : Queue*, Node -> NULL
+// queue_relocate : Node -> NULL
 /*
   Recoloca el Nodo especificado en la primer posicion de la cola
 */
 void queue_relocate(Node node);
 
+// queue_pop : Node -> NULL
+/*
+  Elimina los primeros diez elementos que puede borrar de la cola
+*/
 void queue_pop();
 
 /*--------------------------------------------/
 /               BST FUNCTIONS                 /
 /--------------------------------------------*/
 
-// insert_bst : Queue, Node, String, String -> Node
+// bst_insert : Node, char*, int, char*, int, int -> NULL
 /*
-    Inserta un nuevo nodo en el BST o actualiza el valor si el mismo ya existe
-    y reposicionandolo al frente de la cola
+    Inserta un nuevo nodo en el BST o actualiza el valor si el mismo ya existe,
+    reposicionandolo al frente de la cola
 */
 void bst_insert(Node* root, char* key, int keyLen, char* val, int valLen, int bin);
 
-// delete_bst -> Queue, Node*, String -> int
+// bst_delete -> Node*, char, int -> int
 /*
     Busca y borra un nodo de un BST
     Devuelve 0 si el mismo fue encontrado, (-1) en caso contrario
 */
 int bst_delete(Node* node, char* key, int keyLen);
 
-// search_bst : Queue, Node, String -> String
+// bst_search : Node, char, int, int* -> String
 /*
     Busca un nodo con la misma Key
     Si lo encuentra, devuelve el valor y reposiciona el nodo al frente de la cola
     Si no lo encuentra, devuelve NULL
+    Guardo si es binario o no en el entero bin
 */
 String bst_search(Node node, char* key, int keyLen, int* bin);
 
-// free_bst : Node -> NULL
+// bst_destroy : Node -> NULL
 /*
     Destruye y borra de la memoria un arbol BST
 */
-Node bst_destroy(Node node);
+void bst_destroy(Node node);
 
 /*--------------------------------------------------------/
 /               HASH TABLE FUNCTIONS                      /
@@ -188,7 +192,13 @@ typedef unsigned (*HashFunction)(void *data, int len);
 
 // Estructura Tabla Hash
 /*
-  
+  elems : Node* / Arrays de BST donde se almacenan los nodos
+  stats : Stats / Estructura donde se almacena el estado del servidor
+  locks : pthread_mutex_t / locks de las regiones
+  capacity : unsigned / capacidad total de la tabla
+  range : unsigned / cantidad de nodos por región
+  destr : DestructorFunction / Destruye los BST asociados a las casillas
+  hash : HashFunction / Función Hash de la tabla
 */
 struct _HashTable {
   Node *elems;
@@ -196,7 +206,6 @@ struct _HashTable {
   pthread_mutex_t locks[NUM_REGIONS];
   unsigned capacity;
   unsigned range;
-  CompareFunction comp;
   DestructorFunction destr;
   HashFunction hash;
 };
@@ -204,32 +213,32 @@ typedef struct _HashTable *HashTable;
 
 unsigned hash_word(char* data, int len);
 
-// hashtable_create : unsigned -> HashTable
+// hashtable_create : unsigned -> NULL
 /*
   Crea e inicializa una Tabla Hash
 */
 void hashtable_create(unsigned capacity);
 
-// insert_hashtable : Queue*, HashTable, String, String -> NULL
+// hashtable_insert : char*, int, char*, int, int -> NULL
 /*
   Agrega el par (Key, Value) a la Tabla Hash
 */
 void hashtable_insert(char* key, int keyLen, char* val, int valLen, int bin);
 
-// hashtable_search : Queue*, HashTable, String -> String
+// hashtable_search : char*, int, int* -> String
 /*
   Busca un valor en la Tabla Hash por su Key, retorna el mismo
 */
 String hashtable_search(char* key, int keyLen, int* bin);
 
-// hashtable_delete : Queue*, HashTable, String -> int
+// hashtable_delete : char*, int -> int
 /*
   Borra un valor de la Tabla Hash a partir de su Key
   Si el mismo no se encuentra, se devuelve (-1), en caso contrario, 0
 */
 int hashtable_delete(char* key, int keyLen);
 
-// hashtable_destroy : HashTable -> NULL
+// hashtable_destroy : NULL -> NULL
 /*
   Destruye y borra de la memoria la Tabla Hash
 */

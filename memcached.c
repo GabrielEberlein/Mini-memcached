@@ -11,6 +11,10 @@
 
 int mock_event;
 
+// limit_mem : size_t -> NULL
+/*
+	Limita la memoria del servidor
+*/
 void limit_mem(size_t limit)
 {
 	struct rlimit mem_limit;
@@ -20,7 +24,6 @@ void limit_mem(size_t limit)
         exit(EXIT_FAILURE);
     }
 
-    // mem_limit.rlim_cur = 1073741824;  // 1 GB
 	mem_limit.rlim_max = limit;
 	mem_limit.rlim_cur = limit;
 	printf("%zu\n", limit);
@@ -31,14 +34,20 @@ void limit_mem(size_t limit)
     }
 }
 
+// handle_signals : int -> NULL
+/*
+	Maneja varias señales
+*/
 void handle_signals(int s) {
 	switch (s)
 	{
 	case SIGPIPE:{
+		// Ignoramos la señal para que no se termine el servidor de forma abrupta
 		log(1, "SIGPIPE ERROR");
 		break;
 	}
 	case SIGTSTP:{
+		// Si se cancela el servidor por consola, se lo notificamos a los threads
 		log(1, "SIGSTP");
 		terminate_threads=1;
 		uint64_t dummy=50;
@@ -47,6 +56,7 @@ void handle_signals(int s) {
 		break;
 	}
 	case SIGINT:{
+		// Si se cancela el servidor por consola, se lo notificamos a los threads
 		log(1, "SIGINT");
 		terminate_threads=1;
 		uint64_t dummy=50;
@@ -59,34 +69,46 @@ void handle_signals(int s) {
 	}
 }
 
+// Función principal del servidor
 int main(int argc, char **argv)
 {
 	int text_sock, bin_sock;
 
 	__loglevel = 2;
-	//Magic number: 11400000 1 thread, 5 keys
-	//Magic number: 36470000 4 threads, 1 key
-	//1G = 1073741824
+	
+	// Establece el limite de memoria
 	limit_mem(1073741824);
+
+	// 
 	signal(SIGPIPE, handle_signals);
 	signal(SIGTSTP, handle_signals);
 	signal(SIGINT, handle_signals);
+
+	// Crea la tabla Hash
 	hashtable_create(1000000);
+
+	// Crea la Cola
 	queue_create();
 
+	// Crea el socket del protocolo de texto
 	text_sock = mk_tcp_sock(mc_lport_text);
 	if (text_sock < 0)
 		quit("mk_tcp_sock.text");
 
+	// Crea el socket del protocolo binario
 	bin_sock = mk_tcp_sock(mc_lport_bin);
 	if (bin_sock < 0)
 		quit("mk_tcp_sock.bin");
 
+	// 
 	mock_event = eventfd(0,0);
 	if (mock_event < 0)
 		quit("eventfd");
 
+	// Inicializa el servidor
 	server(text_sock, bin_sock, mock_event);
+
+	// Borra de memoria las estructuras creadas
 	queue_destroy();
 	hashtable_destroy();
 	return 0;

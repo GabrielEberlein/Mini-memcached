@@ -15,14 +15,14 @@ enum stat_enum {PUT_STAT, GET_STAT, DEL_STAT, KEYS_STAT};
     Guarda el estado del servidor
     - amounts : u_int64_t[] / Lista de contadores
         [0] = Cantidad de las operaciones PUT 
-        [0] = Cantidad de las operaciones GET 
-        [0] = Cantidad de las operaciones DEL  
-        [0] = Cantidad de los pares (Key, Value)
+        [1] = Cantidad de las operaciones GET 
+        [2] = Cantidad de las operaciones DEL  
+        [3] = Cantidad de los pares (Key, Value)
     - locks : pthread_mutex_t / Locks de los contadores
         [0] = Lock de las operaciones PUT 
-        [0] = Lock de las operaciones GET 
-        [0] = Lock de las operaciones DEL   
-        [0] = Lock de los pares (Key, Value)
+        [1] = Lock de las operaciones GET 
+        [2] = Lock de las operaciones DEL   
+        [3] = Lock de los pares (Key, Value)
 */ 
 struct _Stats{
     u_int64_t amounts[NUM_STATS];
@@ -36,19 +36,19 @@ typedef struct _Stats *Stats;
 */
 Stats stats_init();
 
-// stats_inc : Stats, int -> NULL
+// stats_inc : Stats, enum stat_enum -> NULL
 /*
     Incrementa el contador especificado
 */
 void stats_inc(Stats stats, enum stat_enum stat);
 
-// stats_dec : Stats, int -> NULL
+// stats_dec : Stats, enum stat_enum -> NULL
 /*
     Decrementa el contador especificado
 */
 void stats_dec(Stats stats, enum stat_enum stat);
 
-// stats_destroy : Stats, int -> NULL
+// stats_destroy : Stats -> NULL
 /*
     Destruye y borra de la memoria los Stats
 */

@@ -9,22 +9,22 @@
 
 ssize_t writen(int fd, const void *buffer, size_t n)
 {
-	ssize_t numWritten; /* # of bytes written by last write() */
-	size_t totWritten; /* Total # of bytes written so far */
+	ssize_t numWritten; /* cantidad total de caracteres a escribir */
+	size_t totWritten; /* cantidad de caracteres escritos por write */
 	const char *buf;
-	buf = buffer; /* No pointer arithmetic on "void *" */
+	buf = buffer;
 	for (totWritten = 0; totWritten < n; ) {
 		numWritten = write(fd, buf, n - totWritten);
 		if (numWritten <= 0) {
 			if (numWritten == -1 && errno == EINTR)
-				continue; /* Interrupted --> restart write() */
+				continue; /* Interrumpido --> reinica write() */
 			else
-				return -1; /* Some other error */
+				return -1; /* otros errores */
 		}
 		totWritten += numWritten;
 		buf += numWritten;
 	}
-	return totWritten; /* Must be 'n' bytes if we get here */
+	return totWritten; /* Se deben haber escrito n caracteres */
 }
 
 int text_parser(char *buf, char *toks[3], int lens[3])

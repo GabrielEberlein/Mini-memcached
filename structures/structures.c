@@ -156,10 +156,11 @@ void queue_pop() {
     exit(EXIT_FAILURE);
   }
   Node node = queue->first;
-  while (node != NULL && count < 10) {
+  while (node != NULL && count < NODES_TO_DELETE) {
     unsigned idx = table->hash(node->key->data, node->key->len) % table->capacity;
     int region = idx / table->range;
-    if(pthread_mutex_trylock(table->locks+region) == 0){
+    if(pthread_mutex_trylock(table->locks+region) == 0) { 
+      // Si la region no esta siendo utilizada, puedo borrar el nodo, si no paso a la siguiente
       bst_delete(table->elems+idx, queue->first->key->data, queue->first->key->len);
       pthread_mutex_unlock(table->locks+region);
       count++;
@@ -202,6 +203,13 @@ void bst_insert(Node* root, char* key, int keyLen, char* val, int valLen, int bi
   }
 }
 
+// bst_replace : Node -> Node
+/*
+  Busca un reemplazo del nodo
+  Si no tiene subarbol izquierde, lo reemplaza por la raiz del subarbol derecho
+  Si no tiene subarbol derecho, lo reemplaza por la raiz del subarbol izquierdo
+  Si tiene ambos subarboles, lo reemplaza por el mayor nodo del subarbol izquierdo
+*/
 Node bst_replace(Node node) {
   Node replacement;
   if(node->left){
@@ -257,7 +265,7 @@ String bst_search(Node node, char* key, int keyLen, int* bin){
   return NULL;
 }
 
-Node bst_destroy(Node node) {
+void bst_destroy(Node node) {
   if(node != NULL){
       string_destroy(node->key);
       string_destroy(node->val);
@@ -266,7 +274,6 @@ Node bst_destroy(Node node) {
       free(node);
       node = NULL;
   }
-  return node;
 }
 
 /*---------------------------------------------------/
@@ -322,7 +329,6 @@ void hashtable_create(unsigned capacity) {
   table->capacity = capacity;
   table->stats = stats_init();
   table->range = capacity / NUM_REGIONS;
-  table->comp = (CompareFunction)string_compare;
   table->destr = (DestructorFunction)bst_destroy;
   table->hash = (HashFunction)hash_word;
 
@@ -354,6 +360,7 @@ void hashtable_insert(char* key, int keyLen, char* val, int valLen, int bin) {
   unsigned idx = table->hash(key, keyLen) % table->capacity;
   int region = idx / table->range;
   log(1,"Inserting in region %d", region);
+  // Lockeamos la region
   pthread_mutex_lock(table->locks+region);
   bst_insert(table->elems+idx, key, keyLen, val, valLen, bin);
   pthread_mutex_unlock(table->locks+region);
@@ -363,6 +370,7 @@ int hashtable_delete(char* key, int keyLen) {
   unsigned idx = table->hash(key, keyLen) % table->capacity;
   int region = idx / table->range;
   log(1,"Deleting in region %d", region);
+  // Lockeamos la region
   pthread_mutex_lock(table->locks+region);
   int res = bst_delete(table->elems+idx, key, keyLen);
   pthread_mutex_unlock(table->locks+region);
@@ -370,10 +378,10 @@ int hashtable_delete(char* key, int keyLen) {
 }
 
 String hashtable_search(char* key, int keyLen, int* bin) {
-  //log(1, "hashtable_search key:%s keyLen:%d", key, keyLen);
   unsigned idx = table->hash(key, keyLen) % table->capacity;
   int region = idx / table->range;
   log(1,"Searching in region %d", region);
+  // Lockeamos la region
   pthread_mutex_lock(table->locks+region);
   String value = bst_search(table->elems[idx], key, keyLen, bin);
   pthread_mutex_unlock(table->locks+region);

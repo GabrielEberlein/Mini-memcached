@@ -12,6 +12,8 @@ enum modes {TEXT, BIN};
     Guarda los datos de cada File Descriptor monitoreado por Epoll
     - fd : int / Indica el File Descriptor asociado al Socket del cliente
     - mode : enum modes / Guarda si el cliente es binario o de texto
+    - buf : char* / Buffer del socket
+    - blen : int / cantidad de caracteres del buffer
 */
 typedef struct Data {
     int fd;
@@ -38,4 +40,8 @@ void epoll_add(int efd, int sock, enum modes mode, int events);
 */
 void epoll_mod(int efd, int sock, enum modes mode, Data* data, int events);
 
+// epoll_del : int, Data* -> NULL
+/*
+    Elimina una entrada en la lista de interes de epoll y borra de la memoria el buffer
+*/
 void epoll_del(int efd, Data* data);

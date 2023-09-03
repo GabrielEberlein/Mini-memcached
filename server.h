@@ -25,7 +25,13 @@ struct ThreadArgs{
 	int efd;
 };
 
-/* Macro interna */
+// Macro para leer del socket
+/*
+	Lee todo lo que puede del socket
+	En el caso de completarse la lectura, devuelve > 0
+	En el caso de ser interrumpido retorna 0
+	En el caso de ocurrir un error de conexión o si que el cliente terminó la conexión, retorna -1
+*/
 #define READ(fd, buf, blen, n) ({							\
 	int pblen = blen; 										\
 	int pn = n;												\
@@ -37,6 +43,21 @@ struct ThreadArgs{
 		return -1;											\
 	rc; }) 													\
 
+// Macro para leer del socket, se va fijando que realizar a partir de cuanto se leyo del buffer
+/*
+	1. Se fija si no se leyo nada del argumento actual, en caso que si,
+	se le aloja suficiente memoria al buffer para guardar los bytes del largo
+	2. Se fija si se leyeron los bytes del largo, en el caso que no,
+	lee todo lo que puede del socket
+	3. Se fija si ya se leyeron los bytes del largo, en caso que si,
+	se le aloja suficiente memoria al buffer para guardar los bytes de la cadena
+	4. Se fija si ya se leyeron los bytes de la cadena, en caso que no,
+	lee todo lo que puede del socket
+
+	En el caso de completarse la lectura, devuelve > 0
+	En el caso de ser interrumpida la lectura, se retorna 0
+	En el caso de ocurrir un error de conexión o si que el cliente terminó la conexión, se retorna -1
+*/
 #define READ_BINARG(fd, buf, blen, off, len) ({ 											\
 	if(blen==off) buf = safe_realloc(buf, off + 4);											\
 	if (blen < off + 4) blen += READ(fd, buf, blen, off + 4 - blen);						\
@@ -47,4 +68,9 @@ struct ThreadArgs{
 	if (blen < off + 4 + len) blen += READ(fd, buf, blen, off + 4 + len - blen);			\
 })																							\
 
+
+// server : int, int, int -> NULL
+/*
+	Inicializa el servidor, creando los distintos threads que manejaran las conexiones
+*/
 void server(int text_sock, int bin_sock, int mock_event);
