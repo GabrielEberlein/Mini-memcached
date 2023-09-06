@@ -250,7 +250,8 @@ String bst_search(Node node, char* key, int keyLen, int* bin, int* ememory){
   if (cmp == 0) {
     queue_relocate(node);
     String newVal;
-    while((newVal = string_create(node->val->data, node->val->len))==NULL){
+    while((newVal = string_create(node->val->data, node->val->len))==NULL && (*ememory) != -1){
+      log(1, "B");
       (*ememory) = queue_pop();
     }
     (*bin) = node->binary;

@@ -22,8 +22,8 @@ int bin_handle(int fd, char* args[3], int lens[3]){
 				// Devolvemos el resultado
 				char k = OK;
 				WRITEN(fd, &k, 1);
-				break;
 			}
+			break;
 		}
 		// Instrucción GET
 		case GET: {

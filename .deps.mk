@@ -1,6 +1,8 @@
-structures.o: structures.c structures.h log.h stats.h
-commons.o: commons.c commons.h log.h
-epoll.o: epoll.c epoll.h
+common.o: common.c common.h log.h
 log.o: log.c log.h
-parser.o: parser.c parser.h
-sock.o: sock.c sock.h
+parser.o: parser.c parser.h common.h log.h
+sock.o: sock.c sock.h common.h log.h
+epoll.o: epoll.c epoll.h
+hash.o: hash.c hash.h bst.h
+bst.o: bst.c bst.h
+stats.o: stats.c stats.h

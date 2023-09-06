@@ -65,7 +65,7 @@ struct ThreadArgs{
 	if (blen < off + 4 + len) blen += READ(fd, buf, blen, off + 4 + len - blen);			\
 })																							\
 
-
+// Macro para comprobar si no ocurrieron errores al escribir en el socket
 #define WRITEN(fd, buf, len) if (writen(fd, buf, len) == -1) return -1;
 
 // server : int, int, int -> NULL

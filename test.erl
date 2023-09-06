@@ -11,9 +11,9 @@ spawn_n(N) ->
     spawn_n(N-1).
 
 test_client(N, S) ->
-    KEY = string:copies("A", N),
-    put(S, KEY, "123"),
-    get(S, KEY),
-    del(S, KEY),
+    %KEY = string:copies("A", N),
+    put(S, "AA", "123"),
+    get(S, "A"),
+    del(S, "A"),
     stats(S),
     test_client(N, S).

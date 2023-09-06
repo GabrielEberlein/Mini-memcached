@@ -145,10 +145,12 @@ int queue_pop();
 /               BST FUNCTIONS                 /
 /--------------------------------------------*/
 
-// bst_insert : Node, char*, int, char*, int, int -> NULL
+// bst_insert : Node, char*, int, char*, int, int -> int
 /*
     Inserta un nuevo nodo en el BST o actualiza el valor si el mismo ya existe,
     reposicionandolo al frente de la cola
+    Si el servidor no puede darle memoria para el nuevo nodo o string, devuelve (-1)
+    Si le puede dar memoria, devuelve 0
 */
 int bst_insert(Node* root, char* key, int keyLen, char* val, int valLen, int bin);
 
@@ -159,11 +161,13 @@ int bst_insert(Node* root, char* key, int keyLen, char* val, int valLen, int bin
 */
 int bst_delete(Node* node, char* key, int keyLen);
 
-// bst_search : Node, char, int, int* -> String
+// bst_search : Node, char, int, int*, int* -> String
 /*
     Busca un nodo con la misma Key
-    Si lo encuentra, devuelve el valor y reposiciona el nodo al frente de la cola
-    Si no lo encuentra, devuelve NULL
+    Si lo encuentra, reposiciona el nodo al final de la cola y guarda el valor en un string,
+      si el servidor no puede darle memoria para guardarlo, devuelve NULL y guarda (-1) en ememory,
+      si el servidor puede darle memoria devuelve el String sin cambiar el ememory
+    Si directamente no lo encuentra, devuelve NULL sin modificar ememory
     Guardo si es binario o no en el entero bin
 */
 String bst_search(Node node, char* key, int keyLen, int* bin, int* ememory);
@@ -219,15 +223,20 @@ unsigned hash_word(char* data, int len);
 */
 void hashtable_create(unsigned capacity);
 
-// hashtable_insert : char*, int, char*, int, int -> NULL
+// hashtable_insert : char*, int, char*, int, int -> int
 /*
   Agrega el par (Key, Value) a la Tabla Hash
+    Si el servidor no le puede dar memoria para crear el nodo o el nuevo string, devuelve (-1)
+    En caso contrario devuelve 0
 */
 int hashtable_insert(char* key, int keyLen, char* val, int valLen, int bin);
 
-// hashtable_search : char*, int, int* -> String
+// hashtable_search : char*, int, int*, int* -> String
 /*
   Busca un valor en la Tabla Hash por su Key, retorna el mismo
+    Si el servidor no le puede dar memoria para crear un string donde
+    almacenar el valor, guarda (-1) en ememory y devuelve NULL
+    En caso contrario devuelve no modifica ememory y devuelve el String
 */
 String hashtable_search(char* key, int keyLen, int* bin, int* ememory);
 
