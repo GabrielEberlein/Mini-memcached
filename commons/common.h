@@ -19,7 +19,7 @@ enum code {
 	EBINARY = 113,
 	EBIG = 114,
 	EUNK = 115,
-	EOOM = 116,
+	ENOMEMORY = 116,
 };
 
 int valid_rq(int code);

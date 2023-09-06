@@ -5,4 +5,4 @@ while :; do
 echo "PUT $K $N"
 echo "GET $K"
 N=$((N+1))
-done | nc localhost 8888
+done | nc localhost 888

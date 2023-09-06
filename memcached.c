@@ -76,8 +76,10 @@ int main(int argc, char **argv)
 
 	__loglevel = 2;
 	
+	//Magic number: 11400000 1 thread, 5 keys
+	//Magic number: 36470000 4 threads, 1 key
 	// Establece el limite de memoria
-	limit_mem(1073741824);
+	limit_mem(36470000);
 
 	// 
 	signal(SIGPIPE, handle_signals);
@@ -105,7 +107,7 @@ int main(int argc, char **argv)
 		quit("eventfd");
 
 	// Crea la tabla Hash
-	hashtable_create(1000000);
+	hashtable_create(1);
 
 	// Crea la Cola
 	queue_create();

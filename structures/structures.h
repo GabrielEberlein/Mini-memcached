@@ -137,9 +137,9 @@ void queue_relocate(Node node);
 
 // queue_pop : Node -> NULL
 /*
-  Elimina los primeros diez elementos que puede borrar de la cola
+  Elimina los primeros NODES_TO_DELETE elementos que puede borrar de la cola
 */
-void queue_pop();
+int queue_pop();
 
 /*--------------------------------------------/
 /               BST FUNCTIONS                 /
@@ -150,7 +150,7 @@ void queue_pop();
     Inserta un nuevo nodo en el BST o actualiza el valor si el mismo ya existe,
     reposicionandolo al frente de la cola
 */
-void bst_insert(Node* root, char* key, int keyLen, char* val, int valLen, int bin);
+int bst_insert(Node* root, char* key, int keyLen, char* val, int valLen, int bin);
 
 // bst_delete -> Node*, char, int -> int
 /*
@@ -166,7 +166,7 @@ int bst_delete(Node* node, char* key, int keyLen);
     Si no lo encuentra, devuelve NULL
     Guardo si es binario o no en el entero bin
 */
-String bst_search(Node node, char* key, int keyLen, int* bin);
+String bst_search(Node node, char* key, int keyLen, int* bin, int* ememory);
 
 // bst_destroy : Node -> NULL
 /*
@@ -179,7 +179,7 @@ void bst_destroy(Node node);
 /--------------------------------------------------------*/
 
 #define SEED 0
-#define NUM_REGIONS 10000
+#define NUM_REGIONS 1
 
 /** Retorna una copia fisica del dato */
 typedef int (*CompareFunction)(void *data1, void *data2);
@@ -223,13 +223,13 @@ void hashtable_create(unsigned capacity);
 /*
   Agrega el par (Key, Value) a la Tabla Hash
 */
-void hashtable_insert(char* key, int keyLen, char* val, int valLen, int bin);
+int hashtable_insert(char* key, int keyLen, char* val, int valLen, int bin);
 
 // hashtable_search : char*, int, int* -> String
 /*
   Busca un valor en la Tabla Hash por su Key, retorna el mismo
 */
-String hashtable_search(char* key, int keyLen, int* bin);
+String hashtable_search(char* key, int keyLen, int* bin, int* ememory);
 
 // hashtable_delete : char*, int -> int
 /*

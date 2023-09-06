@@ -5,7 +5,8 @@
 spawn_n(0) -> 
     ok;
 spawn_n(N) -> 
-    {ok, S} = start(8889),
+    {ok, S} = start(889),
+    put(S, "B", "123"),
     spawn(?MODULE, test_client, [N, S]),
     spawn_n(N-1).
 

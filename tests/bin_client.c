@@ -43,6 +43,7 @@ enum code {
 	EBINARY = 113,
 	EBIG = 114,
 	EUNK = 115,
+	ENOMEMORY = 116,
 };
 
 static void die(char *s, ...)
@@ -101,7 +102,7 @@ int create_sock(char *host, char *port)
 
 int conn()
 {
-	return create_sock("localhost", "8889");
+	return create_sock("localhost", "889");
 }
 
 void writen(int fd, const void *buf, int len)
@@ -277,11 +278,12 @@ void put(const char *k)
 	{
 		int cod = 0;
 		readn(fd, &cod, 1);
-
-		if (cod != OK)
+		
+		if (cod != OK && cod != ENOMEMORY)
 			die("error en pedido, devolvió %i", cod);
-
-		fprintf(stderr, "OK\n");
+		else if (cod == OK){
+			fprintf(stderr, "OK\n");
+		}else fprintf(stderr, "ENOMEMORY\n");
 	}
 }
 

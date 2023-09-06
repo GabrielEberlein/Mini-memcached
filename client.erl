@@ -15,6 +15,7 @@
 -define(EBINARY, <<113>>).
 -define(EBIG, <<114>>).
 -define(EUNK, <<115>>).
+-define(ENOMEMORY, <<116>>).
 
 % Conecta con el servidor especificado, devuelve el identificador
 % de Socket abierto para tal conección.
@@ -62,7 +63,8 @@ handle_receive(Socket, ParsedKey, Task) ->
                 ?EBINARY -> io:format("EBINARY Task:~p Len:~p ~n", [Task, byte_size(ParsedKey)]);
                 ?EBIG -> io:format("EBIG Task:~p Len:~p ~n", [Task, byte_size(ParsedKey)]);
                 ?EUNK -> io:format("EUNK Task:~p Len:~p ~n", [Task, byte_size(ParsedKey)]);
-                Data -> io:format("Data:~p Task:~p Len:~p ~n", [Data, Task, byte_size(ParsedKey)])
+                ?ENOMEMORY -> io:format("ENOMEMORY Task:~p Len:~p ~n", [Task, byte_size(ParsedKey)]);
+                Data -> io:format("Data:~p Task:~p Len: ~n", [Data, Task])
             end;
         {error, Type} -> Type
     end.

@@ -33,9 +33,6 @@ struct ThreadArgs{
 	En el caso de ocurrir un error de conexión o si que el cliente terminó la conexión, retorna -1
 */
 #define READ(fd, buf, blen, n) ({							\
-	int pblen = blen; 										\
-	int pn = n;												\
-	void* pbuf = buf;										\
 	int rc = read(fd, buf + blen, n);						\
 	if (rc < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))\
 		return 0;											\
@@ -68,6 +65,8 @@ struct ThreadArgs{
 	if (blen < off + 4 + len) blen += READ(fd, buf, blen, off + 4 + len - blen);			\
 })																							\
 
+
+#define WRITEN(fd, buf, len) if (writen(fd, buf, len) == -1) return -1;
 
 // server : int, int, int -> NULL
 /*
