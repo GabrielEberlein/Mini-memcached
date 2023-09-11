@@ -98,7 +98,11 @@ void queue_create() {
   queue = malloc(sizeof(struct _Queue));
   queue->first = NULL;
   queue->last = NULL;
-  pthread_mutex_init(&queue->lock, NULL);
+  pthread_mutexattr_t attr;
+  pthread_mutexattr_init(&attr);
+  pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+  pthread_mutex_init(&queue->lock, &attr);
+  pthread_mutexattr_destroy(&attr);
 }
 
 void queue_destroy() {
@@ -155,13 +159,13 @@ int queue_pop() {
   while (node != NULL && count < NODES_TO_DELETE) {
     unsigned idx = table->hash(node->key->data, node->key->len) % table->capacity;
     int region = idx / table->range;
+    node = node->next;
     if(pthread_mutex_trylock(table->locks+region) == 0) { 
       // Si la region no esta siendo utilizada, puedo borrar el nodo, si no paso a la siguiente
       bst_delete(table->elems+idx, queue->first->key->data, queue->first->key->len);
       pthread_mutex_unlock(table->locks+region);
       count++;
     }
-    node = node->next;
   }
   pthread_mutex_unlock(&(queue->lock));
 
