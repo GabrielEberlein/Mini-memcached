@@ -16,6 +16,7 @@ void* safe_malloc(size_t size){
   int r=0;
   void* ptr=NULL;
   while(r != -1 && (ptr=malloc(size)) == NULL){
+    log(1, "Borrar");
     r = queue_pop();
   }
   return ptr;
@@ -155,6 +156,7 @@ void queue_relocate(Node node) {
 }
 
 int queue_pop() {
+  log(1, "Pop");
   int count=0;
   pthread_mutex_lock(&(queue->lock));
   Node node = queue->first;

@@ -18,15 +18,11 @@ enum stat_enum {PUT_STAT, GET_STAT, DEL_STAT, KEYS_STAT};
         [1] = Cantidad de las operaciones GET 
         [2] = Cantidad de las operaciones DEL  
         [3] = Cantidad de los pares (Key, Value)
-    - locks : pthread_mutex_t / Locks de los contadores
-        [0] = Lock de las operaciones PUT 
-        [1] = Lock de las operaciones GET 
-        [2] = Lock de las operaciones DEL   
-        [3] = Lock de los pares (Key, Value)
+    - locks : Lock de los contadores
 */ 
 struct _Stats{
     u_int64_t amounts[NUM_STATS];
-    pthread_mutex_t locks[NUM_STATS];
+    pthread_mutex_t lock;
 };
 typedef struct _Stats *Stats;
 

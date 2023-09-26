@@ -78,7 +78,7 @@ int main(int argc, char **argv)
 	
 	//Magic number: 92870000 4 threads, 1 key
 	// Establece el limite de memoria
-	limit_mem(92870000);
+	limit_mem(536870912);
 
 	// 
 	signal(SIGPIPE, handle_signals);

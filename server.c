@@ -9,6 +9,7 @@ int terminate_threads = 0;
 */
 int bin_handle(int fd, char* args[3], int lens[3]){
 	char cmd = args[0][0];
+	log(1, "cmd: %d", cmd);
 	switch (cmd) {
 		// Instrucción PUT
 		case PUT: {
@@ -50,7 +51,7 @@ int bin_handle(int fd, char* args[3], int lens[3]){
 			break;
 		}
 		// Instrucción DEL
-		case DEL:{
+		case DEL: {
 			// Realizamos las acciones necesarias
 			stats_inc(table->stats, DEL_STAT);
 			int res = hashtable_delete(args[1], lens[1]);
@@ -67,6 +68,7 @@ int bin_handle(int fd, char* args[3], int lens[3]){
 		}
 		// Instrucción STATS
 		case STATS:	{
+			log(1, "STATS Handle");
 			// Devolvemos el resultado
 			char reply = OK, buffer[128];
 			WRITEN(fd, &reply, 1);
@@ -110,9 +112,12 @@ int bin_consume(char** buf, int fd, int* blen) {
 	char cmd = buf[0][0];
 	switch (cmd) {
 		case PUT: {
+			log(1, "PUT");
 			// Leemos los dos argumentos
+			log(1, "PUT buf antes: %d", buf[0][0]);
 			READ_BINARG(fd, *buf, *blen, 1, lens[1]);
 			READ_BINARG(fd, *buf, *blen, 1 + 4 + lens[1], lens[2]);
+			log(1, "PUT buf despues: %d", buf[0][0]);
 			// Parseamos los argumentos
 			args[0]=*buf;
 			args[1]=*buf+1+4;
@@ -122,6 +127,7 @@ int bin_consume(char** buf, int fd, int* blen) {
 			break;
 		}
 		case GET: {
+			log(1, "GET");
 			// Leemos el argumento
 			READ_BINARG(fd, *buf, *blen, 1, lens[1]);
 			// Parseamos los argumentos
@@ -132,8 +138,11 @@ int bin_consume(char** buf, int fd, int* blen) {
 			break;
 		}
 		case DEL: {
+			log(1, "DEL");
+			log(1, "buf1 %d", buf[0][0]);
 			// Leemos el argumento
 			READ_BINARG(fd, *buf, *blen, 1, lens[1]);
+			log(1, "buf2 %d", buf[0][0]);
 			// Parseamos los argumentos
 			args[0] = *buf;
 			args[1] = *buf+1+4;
@@ -142,6 +151,7 @@ int bin_consume(char** buf, int fd, int* blen) {
 			break;
 		}
 		case STATS: {
+			log(1, "STATS");
 			args[0] = *buf;
 			// Manejamos la instrucción
 			if (bin_handle(fd,args,lens) == -1) return -1;
@@ -156,6 +166,7 @@ int bin_consume(char** buf, int fd, int* blen) {
 	}
 	// Al lograr manejar la instruccion, liberamos la memoria del buffer
 	if((*buf) != NULL) {
+		log(1, "bin_consume free");
 		free(*buf);											
 		*buf = NULL;
 	}
@@ -368,6 +379,7 @@ void *thread(void *args) {
 				epoll_mod(efd, data->fd, data->mode, data, EPOLLIN | EPOLLET | EPOLLONESHOT);
 			} else {
 				// Si la conexión no es nueva, maneja la instrucción solicitada por el cliente
+				log(1, "New Client %d Task", data->fd);
 				int r=0;
 				if(data->mode == TEXT) r = text_consume(&(data->buf), data->fd, &(data->blen));
 				if(data->mode == BIN) r = bin_consume(&(data->buf), data->fd, &(data->blen));
