@@ -26,7 +26,7 @@ void limit_mem(size_t limit)
 
 	mem_limit.rlim_max = limit;
 	mem_limit.rlim_cur = limit;
-	printf("%zu\n", limit);
+	printf("Memory limit: %zu\n", limit);
 
     if (setrlimit(RLIMIT_AS, &mem_limit) == -1) {
         perror("setrlimit");
@@ -76,10 +76,9 @@ int main(int argc, char **argv)
 
 	__loglevel = 2;
 	
-	//Magic number: 11400000 1 thread, 5 keys
-	//Magic number: 36470000 4 threads, 1 key
+	//Magic number: 92870000 4 threads, 1 key
 	// Establece el limite de memoria
-	limit_mem(36470000);
+	limit_mem(92870000);
 
 	// 
 	signal(SIGPIPE, handle_signals);
@@ -107,7 +106,7 @@ int main(int argc, char **argv)
 		quit("eventfd");
 
 	// Crea la tabla Hash
-	hashtable_create(1);
+	hashtable_create(1000000);
 
 	// Crea la Cola
 	queue_create();

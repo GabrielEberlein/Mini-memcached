@@ -32,7 +32,7 @@ int epoll_init();
 /*
     Agrega una nueva entrada en la lista de interes de epoll
 */
-void epoll_add(int efd, int sock, enum modes mode, int events);
+int epoll_add(int efd, int sock, enum modes mode, int events);
 
 // epoll_mod : int, int, enum modes, Data*, int -> NULL
 /*

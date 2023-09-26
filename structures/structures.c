@@ -13,16 +13,18 @@ Queue queue = NULL;
 /--------------------------------------------------*/
 
 void* safe_malloc(size_t size){
+  int r=0;
   void* ptr=NULL;
-  while((ptr=malloc(size)) == NULL){
-    queue_pop();
+  while(r != -1 && (ptr=malloc(size)) == NULL){
+    r = queue_pop();
   }
   return ptr;
 }
 
 void* safe_realloc(void* ptr, size_t size){
-  while((ptr=realloc(ptr, size)) == NULL){
-    queue_pop();
+  int r=0;
+  while(r != -1 && (ptr=realloc(ptr, size)) == NULL){
+    r = queue_pop();
   }
   return ptr;
 }
@@ -255,7 +257,6 @@ String bst_search(Node node, char* key, int keyLen, int* bin, int* ememory){
     queue_relocate(node);
     String newVal;
     while((newVal = string_create(node->val->data, node->val->len))==NULL && (*ememory) != -1){
-      log(1, "B");
       (*ememory) = queue_pop();
     }
     (*bin) = node->binary;

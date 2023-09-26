@@ -11,10 +11,11 @@ int epoll_init(){
     return efd;
 }
 
-void epoll_add(int efd, int sock, enum modes mode, int events){
+int epoll_add(int efd, int sock, enum modes mode, int events){
     struct epoll_event ev;
     ev.events = events;
-	Data* data = safe_malloc(sizeof(Data));
+	Data* data;
+	if((data = safe_malloc(sizeof(Data)))==NULL) return -1;
     data->fd = sock;
     data->mode = mode;
 	data->buf = NULL;
@@ -24,6 +25,7 @@ void epoll_add(int efd, int sock, enum modes mode, int events){
 		perror("epoll_ctl: add");
 		exit(EXIT_FAILURE);
 	}
+	return 0;
 }
 
 void epoll_mod(int efd, int sock, enum modes mode, Data* data, int events){

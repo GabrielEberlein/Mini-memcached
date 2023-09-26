@@ -56,12 +56,21 @@ struct ThreadArgs{
 	En el caso de ocurrir un error de conexión o si que el cliente terminó la conexión, se retorna -1
 */
 #define READ_BINARG(fd, buf, blen, off, len) ({ 											\
-	if(blen==off) buf = safe_realloc(buf, off + 4);											\
+	void* newbuf = buf; 																	\
+	if(blen==off) newbuf = safe_realloc(buf, off + 4);										\
+	if(newbuf == NULL) { 																	\
+		char reply = ENOMEMORY;																\
+		WRITEN(fd, &reply, 1);																\
+		return 0;}																			\
 	if (blen < off + 4) blen += READ(fd, buf, blen, off + 4 - blen);						\
 	int len_net;																			\
 	memcpy(&len_net, buf + off, 4);															\
 	len = ntohl(len_net);																	\
-	if(blen==off + 4) buf = safe_realloc(buf, off + 4 + len);								\
+	if(blen==off + 4) newbuf = safe_realloc(buf, off + 4 + len);							\
+	if(newbuf == NULL) { 																	\
+		char reply = ENOMEMORY;																\
+		WRITEN(fd, &reply, 1);																\
+		return 0;}																			\
 	if (blen < off + 4 + len) blen += READ(fd, buf, blen, off + 4 + len - blen);			\
 })																							\
 

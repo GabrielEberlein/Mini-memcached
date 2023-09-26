@@ -95,6 +95,12 @@ int bin_handle(int fd, char* args[3], int lens[3]){
 */
 int bin_consume(char** buf, int fd, int* blen) {
 	if(*buf==NULL) *buf = safe_malloc(1);
+	if((*buf)==NULL) {
+		log(1,"No memory available");
+		char c = ENOMEMORY;
+		WRITEN(fd, &c, 1);
+		return 0;
+	}
 	char *args[3]= {NULL};
 	int lens[3] = {0};
 
@@ -258,6 +264,11 @@ int text_handle(int fd, char *args[3], int lens[3], int nargs){
 */
 int text_consume(char** buf, int fd, int* blen) {
 	if((*buf)==NULL) (*buf) = safe_malloc(2048);
+	if((*buf)==NULL) {
+		log(1,"No memory available");
+		WRITEN(fd, "ENOMEMORY\n", 11);
+		return 0;
+	}
 	while (1) {
 		// int rem = sizeof *buf - blen;
 		int rem = 2048 - (*blen);
@@ -350,8 +361,10 @@ void *thread(void *args) {
 			} else if(data->fd == text_sock || data->fd == bin_sock) {
 				// Si la conexión es nueva, la agrega a la lista de interes del servidor
 				csock = new_client(data->fd);
-				log(1, "New Client id: %d\n", csock);
-				epoll_add(efd, csock, data->mode, EPOLLIN | EPOLLET | EPOLLONESHOT);
+				if(epoll_add(efd, csock, data->mode, EPOLLIN | EPOLLET | EPOLLONESHOT)==-1){
+					log(1,"Client %d unable to connect, no memory available",csock);
+					close(csock);
+				}else log(1, "New Client id: %d\n", csock);
 				epoll_mod(efd, data->fd, data->mode, data, EPOLLIN | EPOLLET | EPOLLONESHOT);
 			} else {
 				// Si la conexión no es nueva, maneja la instrucción solicitada por el cliente
@@ -375,12 +388,25 @@ void server(int text_sock, int bin_sock, int mock_event) {
 	int efd = epoll_init();
 
 	// Agregamos los socket iniciales
-	epoll_add(efd, mock_event, TEXT, EPOLLIN | EPOLLET | EPOLLONESHOT);
-	epoll_add(efd, text_sock, TEXT, EPOLLIN | EPOLLET | EPOLLONESHOT);
-	epoll_add(efd, bin_sock, BIN, EPOLLIN | EPOLLET | EPOLLONESHOT);
+	if(epoll_add(efd, mock_event, TEXT, EPOLLIN | EPOLLET | EPOLLONESHOT) == -1){
+		fprintf(stderr, "Error adding to epoll %d\n", mock_event);
+        exit(EXIT_FAILURE);
+	}
+	if(epoll_add(efd, text_sock, TEXT, EPOLLIN | EPOLLET | EPOLLONESHOT) == -1){
+		fprintf(stderr, "Error adding to epoll %d\n", text_sock);
+        exit(EXIT_FAILURE);
+	};
+	if(epoll_add(efd, bin_sock, BIN, EPOLLIN | EPOLLET | EPOLLONESHOT) == -1){
+		fprintf(stderr, "Error adding to epoll %d\n", bin_sock);
+        exit(EXIT_FAILURE);
+	};
 
 	// Establecemos los argumentos de los threads
-	struct ThreadArgs *args = (struct ThreadArgs*)safe_malloc(sizeof(struct ThreadArgs));
+	struct ThreadArgs *args;
+	if((args = (struct ThreadArgs*)safe_malloc(sizeof(struct ThreadArgs)))==NULL){
+		fprintf(stderr, "Not enough memory to create threads arguments\n");
+        exit(EXIT_FAILURE);
+	};
     args->mock_event = mock_event;
 	args->text_sock = text_sock;
 	args->bin_sock = bin_sock;
