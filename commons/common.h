@@ -43,6 +43,6 @@ static inline void quit(char *s)
 #define STATIC_ASSERT(p)			\
 	int _ass_ ## __LINE__ [(!!(p)) - 1];
 
-const char * error_str(enum code e);
+const char * code_str(enum code e);
 
 #endif

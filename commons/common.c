@@ -20,7 +20,6 @@ const char * code_str(enum code e)
 	case EUNK:	return "EUNK";
 
 	default:
-		assert(0);
 		return "";
 	}
 }

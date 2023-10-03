@@ -19,7 +19,7 @@ typedef struct Data {
     int fd;
     enum modes mode;
     char* buf;
-    int blen;
+    unsigned int blen;
 } Data;
 
 // epoll_init : NULL -> int

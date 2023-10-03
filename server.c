@@ -7,9 +7,8 @@ int terminate_threads = 0;
 /*
 	Maneja las instrucciones del protocolo binario
 */
-int bin_handle(int fd, char* args[3], int lens[3]){
+int bin_handle(int fd, char* args[3], unsigned int lens[3]){
 	char cmd = args[0][0];
-	log(1, "cmd: %d", cmd);
 	switch (cmd) {
 		// Instrucción PUT
 		case PUT: {
@@ -95,8 +94,8 @@ int bin_handle(int fd, char* args[3], int lens[3]){
 	comando ya fue escrito y envia la información de los argumentos a text_handle
 	Devuelve 0 si no ocurrio ningun error, (-1) en el caso que sí
 */
-int bin_consume(char** buf, int fd, int* blen) {
-	if(*buf==NULL) *buf = safe_malloc(1);
+int bin_consume(char** buf, int fd, unsigned int* blen) {
+	if((*buf)==NULL) *buf = safe_malloc(1);
 	if((*buf)==NULL) {
 		log(1,"No memory available");
 		char c = ENOMEMORY;
@@ -104,20 +103,19 @@ int bin_consume(char** buf, int fd, int* blen) {
 		return 0;
 	}
 	char *args[3]= {NULL};
-	int lens[3] = {0};
+	unsigned int lens[3] = {0};
 
 	// Leemos el primer byte, la instrucción, si es todavia no leyo nada
 	if ((*blen) == 0) (*blen) += READ(fd, *buf, *blen, 1);
 
-	char cmd = buf[0][0];
+	enum code cmd = buf[0][0];
+	log(1,"CMD: %s", code_str(cmd));
+
 	switch (cmd) {
 		case PUT: {
-			log(1, "PUT");
 			// Leemos los dos argumentos
-			log(1, "PUT buf antes: %d", buf[0][0]);
 			READ_BINARG(fd, *buf, *blen, 1, lens[1]);
 			READ_BINARG(fd, *buf, *blen, 1 + 4 + lens[1], lens[2]);
-			log(1, "PUT buf despues: %d", buf[0][0]);
 			// Parseamos los argumentos
 			args[0]=*buf;
 			args[1]=*buf+1+4;
@@ -127,7 +125,6 @@ int bin_consume(char** buf, int fd, int* blen) {
 			break;
 		}
 		case GET: {
-			log(1, "GET");
 			// Leemos el argumento
 			READ_BINARG(fd, *buf, *blen, 1, lens[1]);
 			// Parseamos los argumentos
@@ -138,11 +135,8 @@ int bin_consume(char** buf, int fd, int* blen) {
 			break;
 		}
 		case DEL: {
-			log(1, "DEL");
-			log(1, "buf1 %d", buf[0][0]);
 			// Leemos el argumento
 			READ_BINARG(fd, *buf, *blen, 1, lens[1]);
-			log(1, "buf2 %d", buf[0][0]);
 			// Parseamos los argumentos
 			args[0] = *buf;
 			args[1] = *buf+1+4;
@@ -151,7 +145,6 @@ int bin_consume(char** buf, int fd, int* blen) {
 			break;
 		}
 		case STATS: {
-			log(1, "STATS");
 			args[0] = *buf;
 			// Manejamos la instrucción
 			if (bin_handle(fd,args,lens) == -1) return -1;
@@ -166,7 +159,7 @@ int bin_consume(char** buf, int fd, int* blen) {
 	}
 	// Al lograr manejar la instruccion, liberamos la memoria del buffer
 	if((*buf) != NULL) {
-		log(1, "bin_consume free");
+		// log(1, "bin_consume free");
 		free(*buf);											
 		*buf = NULL;
 	}
@@ -178,7 +171,7 @@ int bin_consume(char** buf, int fd, int* blen) {
 /*
 	Maneja las instrucciones del protocolo de texto
 */
-int text_handle(int fd, char *args[3], int lens[3], int nargs){
+int text_handle(int fd, char *args[3], unsigned int lens[3], int nargs){
 	char *cmd = args[0];
 	// Instrucción PUT
     if(strcmp(cmd,"PUT") == 0) {
@@ -273,7 +266,7 @@ int text_handle(int fd, char *args[3], int lens[3], int nargs){
 	la información de los argumentos a text_handle
 	Devuelve 0 si no ocurrio ningun error, (-1) en el caso que sí
 */
-int text_consume(char** buf, int fd, int* blen) {
+int text_consume(char** buf, int fd, unsigned int* blen) {
 	if((*buf)==NULL) (*buf) = safe_malloc(2048);
 	if((*buf)==NULL) {
 		log(1,"No memory available");
@@ -303,15 +296,15 @@ int text_consume(char** buf, int fd, int* blen) {
 		// Movemos los caracteres leidos del socket al buffer
 		(*blen) += READ(fd, *buf, *blen, rem);	
 		char *p, *p0 = (*buf);
-		int nlen = (*blen);
+		unsigned int nlen = (*blen);
 
 		// Para cada \n, procesar, y avanzar punteros
 		while ((p = memchr(p0, '\n', nlen)) != NULL) {
 			/* Obtuvismos el mensaje completo */
-			int len = p - p0;
+			unsigned int len = p - p0;
 			*p++ = 0;
 			char *toks[3]= {NULL};
-			int lens[3] = {0};
+			unsigned int lens[3] = {0};
 			int ntok;
 			// Parseamos el mensaje en los argumentos
 			ntok = text_parser(p0, toks, lens);
@@ -379,12 +372,15 @@ void *thread(void *args) {
 				epoll_mod(efd, data->fd, data->mode, data, EPOLLIN | EPOLLET | EPOLLONESHOT);
 			} else {
 				// Si la conexión no es nueva, maneja la instrucción solicitada por el cliente
-				log(1, "New Client %d Task", data->fd);
 				int r=0;
 				if(data->mode == TEXT) r = text_consume(&(data->buf), data->fd, &(data->blen));
 				if(data->mode == BIN) r = bin_consume(&(data->buf), data->fd, &(data->blen));
 				
-				if(r == 0) epoll_mod(efd, data->fd, data->mode, data, EPOLLIN | EPOLLET | EPOLLONESHOT);
+				if(r == 0) {
+					if((data->buf == NULL && data->blen != 0) || (data->buf != NULL && data->blen == 0))
+						log(1,"COMO?????");
+					epoll_mod(efd, data->fd, data->mode, data, EPOLLIN | EPOLLET | EPOLLONESHOT);
+				}
 				else{
 					log(1, "Closed Client id: %d\n", data->fd);
 					epoll_del(efd, data);							

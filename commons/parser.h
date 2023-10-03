@@ -24,6 +24,6 @@ ssize_t writen(int fd, const void *buffer, size_t n);
 /*
     Separa un strings en tres, a partir de los espacios
 */
-int text_parser(char *buf, char *toks[3], int lens[3] );
+int text_parser(char *buf, char *toks[3], unsigned int lens[3] );
 
 #endif

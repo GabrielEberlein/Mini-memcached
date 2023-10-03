@@ -27,7 +27,7 @@ ssize_t writen(int fd, const void *buffer, size_t n)
 	return totWritten; /* Se deben haber escrito n caracteres */
 }
 
-int text_parser(char *buf, char *toks[3], int lens[3])
+int text_parser(char *buf, char *toks[3], unsigned int lens[3])
 {
 //	char *toks[10];
 //	int lens[10];

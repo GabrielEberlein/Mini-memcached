@@ -16,7 +16,6 @@ void* safe_malloc(size_t size){
   int r=0;
   void* ptr=NULL;
   while(r != -1 && (ptr=malloc(size)) == NULL){
-    log(1, "Borrar");
     r = queue_pop();
   }
   return ptr;
@@ -24,10 +23,14 @@ void* safe_malloc(size_t size){
 
 void* safe_realloc(void* ptr, size_t size){
   int r=0;
-  while(r != -1 && (ptr=realloc(ptr, size)) == NULL){
+  void* newptr=ptr;
+  while(r != -1 && (newptr=realloc(ptr, size)) == NULL){
     r = queue_pop();
   }
-  return ptr;
+  if(newptr==NULL) {
+    free(ptr);
+  }
+  return newptr;
 }
 
 /*-----------------------------------------------/
@@ -156,7 +159,6 @@ void queue_relocate(Node node) {
 }
 
 int queue_pop() {
-  log(1, "Pop");
   int count=0;
   pthread_mutex_lock(&(queue->lock));
   Node node = queue->first;
@@ -363,7 +365,7 @@ unsigned hash_word(char* data, int len) {
 int hashtable_insert(char* key, int keyLen, char* val, int valLen, int bin) {
   unsigned idx = table->hash(key, keyLen) % table->capacity;
   int region = idx / table->range;
-  log(1,"Inserting in region %d", region);
+  // log(1,"Inserting in region %d", region);
   // Lockeamos la region
   pthread_mutex_lock(table->locks+region);
   int r = bst_insert(table->elems+idx, key, keyLen, val, valLen, bin);
@@ -374,7 +376,7 @@ int hashtable_insert(char* key, int keyLen, char* val, int valLen, int bin) {
 int hashtable_delete(char* key, int keyLen) {
   unsigned idx = table->hash(key, keyLen) % table->capacity;
   int region = idx / table->range;
-  log(1,"Deleting in region %d", region);
+  // log(1,"Deleting in region %d", region);
   // Lockeamos la region
   pthread_mutex_lock(table->locks+region);
   int res = bst_delete(table->elems+idx, key, keyLen);
@@ -385,7 +387,7 @@ int hashtable_delete(char* key, int keyLen) {
 String hashtable_search(char* key, int keyLen, int* bin, int* ememory) {
   unsigned idx = table->hash(key, keyLen) % table->capacity;
   int region = idx / table->range;
-  log(1,"Searching in region %d", region);
+  // log(1,"Searching in region %d", region);
   // Lockeamos la region
   pthread_mutex_lock(table->locks+region);
   String value = bst_search(table->elems[idx], key, keyLen, bin, ememory);

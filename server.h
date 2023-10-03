@@ -12,6 +12,7 @@
 #include "commons/common.h"
 #include "commons/parser.h"
 #include "structures/stats.h"
+#include "commons/log.h"
 #include "structures/structures.h"
 #include "commons/epoll.h"
 
@@ -56,26 +57,33 @@ struct ThreadArgs{
 	En el caso de ocurrir un error de conexión o si que el cliente terminó la conexión, se retorna -1
 */
 #define READ_BINARG(fd, buf, blen, off, len) ({ 											\
-	void* newbuf;																			\
-	if(blen==off) newbuf = safe_realloc(buf, off + 4); 										\
-	if(newbuf == NULL) { 																	\
+	if(blen==off) buf = safe_realloc(buf, off + 4); 										\
+	if(buf == NULL) { 																		\
+		blen=0;																				\
 		char reply = ENOMEMORY;																\
 		WRITEN(fd, &reply, 1);																\
-		free(buf);																			\
 		return 0;}																			\
-	buf = newbuf;																			\
-	if (blen < off + 4) blen += READ(fd, buf, blen, off + 4 - blen);						\
-	int len_net;																			\
+	if (blen < off + 4){																	\
+		int rc = READ(fd, buf, blen, off + 4 - blen);										\
+		if(rc < off + 4 - blen)	{\
+			len+=rc;				\
+			return 0;}				\
+		blen+=rc;}																			\
+	unsigned int len_net;																	\
 	memcpy(&len_net, buf + off, 4);															\
 	len = ntohl(len_net);																	\
-	if(blen==off + 4) newbuf = safe_realloc(buf, off + 4 + len);							\
-	if(newbuf == NULL) { 																	\
+	if(blen==off + 4) buf = safe_realloc(buf, off + 4 + len);								\
+	if(buf == NULL) { 																		\
+		blen=0;																				\
 		char reply = ENOMEMORY;																\
 		WRITEN(fd, &reply, 1);																\
-		free(buf);																			\
 		return 0;}																			\
-	buf = newbuf;																			\
-	if (blen < off + 4 + len) blen += READ(fd, buf, blen, off + 4 + len - blen);			\
+	if (blen < off + 4 + len) {																\
+		int rc = READ(fd, buf, blen, off + 4 + len - blen);									\
+		if(rc < off + 4 + len - blen) {														\
+			blen+=rc;																		\
+			return 0;}																		\
+		blen+=rc;}																			\
 })																							\
 
 // Macro para comprobar si no ocurrieron errores al escribir en el socket

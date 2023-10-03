@@ -4,7 +4,7 @@
 
 random_String(0, Acc) ->
     lists:reverse(Acc);
-random_String(Length, Acc) when Length > 0 ->
+random_String(Length, Acc) ->
     RandomChar = random_Char(),
     random_String(Length - 1, [RandomChar | Acc]).
 
@@ -27,6 +27,6 @@ test_client(S) ->
     Val = random_String(LenVal, []),
     put(S, Key, Val),
     get(S, Key),
-    %del(S, Key),
-    stats(S),
+    % del(S, Key),
+    % stats(S),
     test_client(S).
