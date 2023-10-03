@@ -66,7 +66,7 @@ struct ThreadArgs{
 	if (blen < off + 4){																	\
 		int rc = READ(fd, buf, blen, off + 4 - blen);										\
 		if(rc < off + 4 - blen)	{\
-			len+=rc;				\
+			blen+=rc;				\
 			return 0;}				\
 		blen+=rc;}																			\
 	unsigned int len_net;																	\

@@ -1,6 +1,7 @@
 -module(test).
 -import(client, [start/1, put/3, get/2, del/2, stats/1]).
 -export([spawn_n/1, test_client/1]).
+-define(ENOTFOUND, <<112>>).
 
 random_String(0, Acc) ->
     lists:reverse(Acc);
@@ -26,7 +27,8 @@ test_client(S) ->
     Key = random_String(LenKey, []),
     Val = random_String(LenVal, []),
     put(S, Key, Val),
-    get(S, Key),
-    % del(S, Key),
-    % stats(S),
+    {ok, Val} = get(S, Key),
+    del(S, Key),
+    enotfound = get(S, Key),
+    %stats(S),
     test_client(S).

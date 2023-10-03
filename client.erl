@@ -25,7 +25,7 @@ start(ServerPort) -> gen_tcp:connect("localhost", ServerPort, [{active, false}, 
 parse_to_binary(X) ->
     Binary = term_to_binary(X),
     BinLength = byte_size(Binary),
-    io:format("Binary Length Argument: ~p~n", [BinLength]),
+    %io:format("Binary Length Argument: ~p~n", [BinLength]),
     <<BinLength:32, Binary/binary>>.
 
 % Parsea los argumentos de la respuesta segun la especificación en binario dada por el enunciado

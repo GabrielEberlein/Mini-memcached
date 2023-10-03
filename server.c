@@ -67,7 +67,6 @@ int bin_handle(int fd, char* args[3], unsigned int lens[3]){
 		}
 		// Instrucción STATS
 		case STATS:	{
-			log(1, "STATS Handle");
 			// Devolvemos el resultado
 			char reply = OK, buffer[128];
 			WRITEN(fd, &reply, 1);
@@ -109,7 +108,6 @@ int bin_consume(char** buf, int fd, unsigned int* blen) {
 	if ((*blen) == 0) (*blen) += READ(fd, *buf, *blen, 1);
 
 	enum code cmd = buf[0][0];
-	log(1,"CMD: %s", code_str(cmd));
 
 	switch (cmd) {
 		case PUT: {
@@ -377,8 +375,6 @@ void *thread(void *args) {
 				if(data->mode == BIN) r = bin_consume(&(data->buf), data->fd, &(data->blen));
 				
 				if(r == 0) {
-					if((data->buf == NULL && data->blen != 0) || (data->buf != NULL && data->blen == 0))
-						log(1,"COMO?????");
 					epoll_mod(efd, data->fd, data->mode, data, EPOLLIN | EPOLLET | EPOLLONESHOT);
 				}
 				else{
